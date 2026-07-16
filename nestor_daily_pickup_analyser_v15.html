@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<!--
+  Nestor Daily Pickup & Cancellation Control — v15
+  Designed and developed by Natalia (Revenue Manager, Nestor Stay)
+  © 2026 Natalia. All rights reserved.
+  Original work: concept, methodology (pickup / cancellation-charge / rate-plan
+  audit logic) and implementation. Shared privately for internal review.
+  Contact: natalia.gmfz@gmail.com
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nestor — Daily Pickup &amp; Cancellation Control</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%231E4155"/><text x="50" y="71" text-anchor="middle" font-family="Georgia,serif" font-size="62" font-weight="600" fill="white">n</text></svg>'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Nestor Stay brand — navy from the round "n" logo */
+  --nestor-brand:#1E4155;--nestor-brand-soft:#DEE9EF;--nestor-brand-ink:#12303F;--nestor-brand-hover:#2E5B79;
+  --nestor-bg:#F4F7F9;--nestor-surface:#FFFFFF;--nestor-surface-alt:#EDF2F5;--nestor-line:#D8E2E8;--nestor-line-soft:#E6EDF1;
+  --nestor-ink:#16303F;--nestor-ink-soft:#41586A;--nestor-muted:#7C8E9A;
+  /* orange kept ONLY for wrong-rate-plan alerts */
+  --nestor-accent:#C66B2E;--nestor-accent-soft:#F4E1CF;--nestor-accent-ink:#8A4A1F;
+  --nestor-green:#2F6E4E;--nestor-green-soft:#DCEADF;--nestor-red:#A8362A;--nestor-red-soft:#F4D9D2;
+  --nestor-amber:#B6841A;--nestor-amber-soft:#F6E6BF;--nestor-info:#2E5B8C;--nestor-info-soft:#DBE7F4;
+  --nestor-violet:#5F4DA8;--nestor-violet-soft:#E3DFF6;
+  --font-display:'Playfair Display','Cormorant Garamond',Georgia,serif;
+  --font-sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --font-mono:'SFMono-Regular',Menlo,Consolas,monospace;
+  --r-sm:6px;--r-md:10px;--r-lg:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--nestor-bg);color:var(--nestor-ink);font-family:var(--font-sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{padding:32px 24px 64px}
+.page{max-width:1320px;margin:0 auto}
+.brand-bar{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--nestor-brand);padding-bottom:16px;margin-bottom:24px}
+.brand-left{display:flex;align-items:center;gap:14px}
+.brand-monogram{width:48px;height:48px;flex:0 0 48px;display:block}
+.brand-word{font-family:var(--font-display);font-weight:600;font-size:32px;letter-spacing:1px;color:var(--nestor-brand);line-height:1}
+.brand-word .dot{color:var(--nestor-brand)}
+.brand-tag{font-size:12px;color:var(--nestor-muted);letter-spacing:2px;text-transform:uppercase;margin-top:5px}
+.brand-sub{font-size:12px;color:var(--nestor-muted);letter-spacing:1px;text-transform:uppercase;text-align:right}
+.brand-sub strong{display:block;color:var(--nestor-brand-ink);font-size:13px;letter-spacing:1.5px}
+button{font-family:var(--font-sans);font-size:14px;font-weight:500;background:var(--nestor-brand);color:#fff;border:none;border-radius:var(--r-md);padding:10px 16px;cursor:pointer;transition:background 0.15s,transform 0.05s}
+button:hover{background:var(--nestor-brand-hover)}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:0.6;cursor:not-allowed}
+button.secondary{background:transparent;color:var(--nestor-ink);border:1px solid var(--nestor-line)}
+button.secondary:hover{background:var(--nestor-surface-alt);color:var(--nestor-brand);border-color:var(--nestor-brand)}
+.upload-zone{background:var(--nestor-surface);border:1.5px dashed var(--nestor-brand);border-radius:var(--r-lg);padding:48px 24px;text-align:center;cursor:pointer;transition:background 0.15s,border-color 0.15s}
+.upload-zone:hover{background:var(--nestor-surface-alt)}
+.upload-zone.drag{background:var(--nestor-brand-soft);border-color:var(--nestor-brand)}
+.upload-label{font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--nestor-ink);margin-bottom:6px}
+.upload-sub{font-size:14px;color:var(--nestor-muted)}
+.legend-box{background:var(--nestor-surface);border:1px solid var(--nestor-line);border-left:4px solid var(--nestor-brand);border-radius:var(--r-md);padding:14px 18px;margin-bottom:18px;font-size:13px;color:var(--nestor-ink-soft);line-height:1.85}
+.legend-box strong{font-weight:600;color:var(--nestor-ink)}
+.legend-box .warn{color:var(--nestor-brand-ink)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:18px 0}
+.stat{background:var(--nestor-surface);border:1px solid var(--nestor-line);border-radius:var(--r-md);padding:14px 16px}
+.stat.leak{border-left:4px solid var(--nestor-red)}
+.stat.good{border-left:4px solid var(--nestor-green)}
+.stat-label{font-size:12px;color:var(--nestor-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px}
+.stat-val{font-family:var(--font-display);font-size:26px;font-weight:600;color:var(--nestor-ink);line-height:1.1}
+.stat-val.red{color:var(--nestor-red)}
+.stat-val.green{color:var(--nestor-green)}
+.section-title{font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--nestor-ink);margin:24px 0 10px;letter-spacing:0.2px}
+.section-title.leak{color:var(--nestor-red)}
+.flag-card{background:var(--nestor-surface);border:1px solid var(--nestor-line);border-radius:var(--r-md);padding:14px 16px;margin-bottom:10px}
+.flag-card.danger{border-left:4px solid var(--nestor-red)}
+.flag-card.warning{border-left:4px solid var(--nestor-amber)}
+.flag-card.info{border-left:4px solid var(--nestor-info)}
+.flag-card.purple{border-left:4px solid var(--nestor-violet)}
+.flag-card.orange{border-left:4px solid var(--nestor-accent)}
+.flag-header{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.flag-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;letter-spacing:0.3px;text-transform:uppercase}
+.flag-badge.danger{background:var(--nestor-red-soft);color:var(--nestor-red)}
+.flag-badge.warning{background:var(--nestor-amber-soft);color:var(--nestor-amber)}
+.flag-badge.info{background:var(--nestor-info-soft);color:var(--nestor-info)}
+.flag-badge.purple{background:var(--nestor-violet-soft);color:var(--nestor-violet)}
+.flag-badge.orange{background:var(--nestor-accent-soft);color:var(--nestor-accent-ink)}
+.flag-amount{margin-left:auto;font-family:var(--font-display);font-weight:600;color:var(--nestor-red);font-size:16px}
+.flag-title{font-size:15px;font-weight:600;color:var(--nestor-ink)}
+.flag-detail{font-size:14px;color:var(--nestor-ink-soft);line-height:1.55}
+.flag-meta{font-size:12px;color:var(--nestor-muted);margin-top:6px;font-family:var(--font-mono)}
+.ai-box{background:var(--nestor-surface);border:1px solid var(--nestor-line);border-left:4px solid var(--nestor-brand);border-radius:var(--r-md);padding:18px 20px;margin-top:18px}
+.ai-label{font-size:11px;font-weight:600;color:var(--nestor-brand-ink);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.8px}
+.ai-text{font-size:14.5px;color:var(--nestor-ink);line-height:1.75;white-space:pre-wrap}
+.prop-filter{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+.prop-btn{font-family:var(--font-sans);font-size:13px;padding:6px 14px;border:1px solid var(--nestor-line);border-radius:999px;cursor:pointer;background:var(--nestor-surface);color:var(--nestor-ink-soft);transition:all 0.15s;font-weight:500}
+.prop-btn:hover{border-color:var(--nestor-brand);color:var(--nestor-brand-ink)}
+.prop-btn.active{background:var(--nestor-brand);color:#fff;border-color:var(--nestor-brand);font-weight:600}
+.prop-btn .dist-tag{font-size:10px;opacity:0.7;margin-left:4px}
+/* tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--nestor-line);margin:6px 0 0}
+.tab{padding:11px 20px;font-weight:600;font-size:14px;color:var(--nestor-muted);cursor:pointer;background:none;border:none;border-bottom:3px solid transparent;border-radius:0;transition:color .15s}
+.tab:hover{color:var(--nestor-brand-ink);background:none}
+.tab.active{color:var(--nestor-ink);border-bottom-color:var(--nestor-brand)}
+.tab .count{display:inline-block;margin-left:7px;font-size:12px;background:var(--nestor-surface-alt);border:1px solid var(--nestor-line);color:var(--nestor-ink-soft);border-radius:999px;padding:1px 8px;font-weight:600}
+.tab.active .count{background:var(--nestor-brand-soft);border-color:var(--nestor-brand-soft);color:var(--nestor-brand-ink)}
+.tab.alert .count{background:var(--nestor-red-soft);border-color:var(--nestor-red-soft);color:var(--nestor-red)}
+/* date controls */
+.controls{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;background:var(--nestor-surface);border:1px solid var(--nestor-line);border-radius:var(--r-md);padding:14px 16px;margin:16px 0}
+.ctl{display:flex;flex-direction:column;gap:5px}
+.ctl label{font-size:11px;color:var(--nestor-muted);text-transform:uppercase;letter-spacing:0.6px;font-weight:600}
+.ctl input[type=date]{font-family:var(--font-sans);font-size:14px;padding:8px 10px;border:1px solid var(--nestor-line);border-radius:var(--r-sm);background:var(--nestor-surface);color:var(--nestor-ink)}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+.preset{font-size:12px;padding:7px 11px;border:1px solid var(--nestor-line);background:var(--nestor-surface);color:var(--nestor-ink-soft);border-radius:999px;font-weight:500}
+.preset:hover{background:var(--nestor-surface-alt);color:var(--nestor-brand-ink);border-color:var(--nestor-brand)}
+.win-note{font-size:12.5px;color:var(--nestor-muted);margin-left:auto;align-self:center;font-style:italic}
+.coverage{font-size:12.5px;color:var(--nestor-muted);margin:-6px 0 8px;font-family:var(--font-mono)}
+.coverage strong{color:var(--nestor-brand-ink);font-weight:600}
+.tbl-wrap{overflow-x:auto;margin-top:10px;background:var(--nestor-surface);border:1px solid var(--nestor-line);border-radius:var(--r-md)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:12px;border-bottom:1px solid var(--nestor-line);font-weight:600;color:var(--nestor-muted);white-space:nowrap;font-size:12px;text-transform:uppercase;letter-spacing:0.6px;background:var(--nestor-surface-alt)}
+td{padding:11px 12px;border-bottom:1px solid var(--nestor-line-soft);color:var(--nestor-ink);white-space:nowrap;font-size:14px}
+td.mono{font-family:var(--font-mono);font-size:12.5px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--nestor-surface-alt)}
+.mismatch-row td{background:rgba(246,230,191,0.45)}
+.mismatch-row:hover td{background:rgba(246,230,191,0.75)}
+.leak-row td{background:rgba(244,217,210,0.5)}
+.leak-row:hover td{background:rgba(244,217,210,0.8)}
+.within-row td{background:rgba(220,234,223,0.4)}
+.within-row:hover td{background:rgba(220,234,223,0.7)}
+.pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:999px;font-weight:600;letter-spacing:0.2px}
+.pill.above{background:var(--nestor-green-soft);color:var(--nestor-green)}
+.pill.below{background:var(--nestor-red-soft);color:var(--nestor-red)}
+.pill.match{background:var(--nestor-info-soft);color:var(--nestor-info)}
+.pill.charge{background:var(--nestor-red-soft);color:var(--nestor-red)}
+.pill.within{background:var(--nestor-green-soft);color:var(--nestor-green)}
+.pill.unknown{background:var(--nestor-amber-soft);color:var(--nestor-amber)}
+.pill.wrong{background:var(--nestor-accent-soft);color:var(--nestor-accent-ink)}
+.pill.new{background:var(--nestor-violet-soft);color:var(--nestor-violet)}
+.pill.old{background:var(--nestor-surface-alt);color:var(--nestor-muted);border:1px solid var(--nestor-line)}
+.empty{font-size:14px;color:var(--nestor-muted);padding:18px 4px}
+.results-header{display:flex;justify-content:space-between;align-items:center;margin:18px 0 6px;gap:10px;flex-wrap:wrap}
+.results-header .actions{display:flex;gap:8px}
+.file-name-label{font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--nestor-ink)}
+.hidden{display:none}
+#analyze-btn{margin-top:16px;width:100%;padding:14px;font-size:15px;font-weight:600;border-radius:var(--r-md)}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.35);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+/* ===== v15 — dashboard & compact tables ===== */
+.seg{display:inline-flex;background:var(--nestor-surface-alt);border:1px solid var(--nestor-line);border-radius:999px;padding:3px;gap:2px}
+.seg button{background:none;color:var(--nestor-ink-soft);border:none;border-radius:999px;padding:7px 16px;font-size:13px;font-weight:500}
+.seg button:hover{background:var(--nestor-surface);color:var(--nestor-brand-ink)}
+.seg button.active{background:var(--nestor-brand);color:#fff;font-weight:600}
+.dash-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:18px 0 4px}
+.dash-controls .lbl{font-size:11px;color:var(--nestor-muted);text-transform:uppercase;letter-spacing:0.6px;font-weight:600}
+.bar-wrap{display:flex;align-items:center;gap:8px}
+.bar-track{position:relative;flex:1;background:var(--nestor-surface-alt);border-radius:4px;height:18px;min-width:110px;overflow:hidden}
+.bar-fill{position:absolute;top:0;bottom:0;left:0;background:var(--nestor-brand);border-radius:4px;opacity:0.85}
+.bar-cell{min-width:200px}
+th.num,td.num{text-align:right}
+.grp-head td{background:var(--nestor-brand-soft) !important;border-top:2px solid var(--nestor-brand);font-size:13px;padding:9px 12px}
+.grp-head .grp-sub{margin-left:12px;color:var(--nestor-ink-soft);font-weight:400;font-size:12.5px}
+.clickable-row{cursor:pointer}
+.dash-note{font-size:12.5px;color:var(--nestor-muted);margin:10px 0 0;font-style:italic}
+@media (max-width:900px){body{padding:20px 14px 48px}.brand-word{font-size:24px}.brand-monogram{width:38px;height:38px;flex-basis:38px}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="brand-bar">
+    <div class="brand-left">
+      <!-- Nestor Stay logo — navy roundel with white serif "n" -->
+      <svg class="brand-monogram" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Nestor logo">
+        <circle cx="50" cy="50" r="50" fill="var(--nestor-brand)"/>
+        <text x="50" y="71" text-anchor="middle" font-family="'Playfair Display',Georgia,serif" font-size="62" font-weight="600" fill="#FFFFFF">n</text>
+      </svg>
+      <div>
+        <div class="brand-word">nestor<span class="dot">.</span></div>
+        <div class="brand-tag">Daily Pickup &amp; Cancellation Control</div>
+      </div>
+    </div>
+    <div class="brand-sub">Revenue Management<strong>v15</strong></div>
+  </div>
+
+  <h2 class="sr-only">Nestor daily pickup and cancellation control — v15</h2>
+
+  <div id="upload-area">
+    <div class="legend-box">
+      <strong>What this does</strong> — load your Apaleo export, pick a date window, then work three tabs:<br>
+      <strong>· Pickup</strong> — bookings <em>created</em> in the window (your new business for the day/days), with wrong-rate-plan checks.<br>
+      <strong>· Cancellations</strong> — bookings <em>cancelled</em> in the window, each checked against its cancellation-policy terms: <span style="color:var(--nestor-green);font-weight:600">Within terms</span> (no charge) vs <span style="color:var(--nestor-red);font-weight:600">Outside terms → charge due</span>. Totals the revenue to recover.<br>
+      <strong>· All</strong> — the full file.<br>
+      <strong>New in v15</strong> — opens on a <strong>Dashboard</strong>: click any property to see its bookings split by channel, by month or by stay date, each checked against budget ADR. Booking lists are grouped by property in a compact, readable layout — hit “Show full detail” whenever you need every Apaleo column. The v14 date fix and CSV export are unchanged.<br>
+      <span class="warn"><strong>Distribution:</strong> CARLYSLE (CAR) &amp; THE ANTIGALLICAN (DAG) use the NEW distribution (OTALOS / OTASEMILOS); all others use the OLD matrix — LOW (Oct–Apr) / HIGH (May–Sep) × plan × unit tier (Studio·1BD / 2BD / 3BD+4BD). Flex 24H=1d, Flex 3D=3d, SemiFlex 7D=7d, SemiFlex 14D=14d, NONREF=always chargeable.</span>
+    </div>
+    <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="upload-label">Drop your Apaleo Excel export here</div>
+      <div class="upload-sub">or click to browse — .xlsx files only · needs Created at, Cancellation date, Status, Arrival, Rate plan, Unit group</div>
+    </div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
+  </div>
+
+  <div id="results" class="hidden">
+    <div class="results-header">
+      <div class="file-name-label" id="file-name-label"></div>
+      <div class="actions">
+        <button class="secondary" id="style-toggle" onclick="toggleStyle()">Show full detail</button>
+        <button class="secondary" onclick="exportCSV()">Export view (CSV)</button>
+        <button class="secondary" onclick="resetTool()">Load new file</button>
+      </div>
+    </div>
+    <div class="coverage" id="coverage"></div>
+
+    <div class="controls">
+      <div class="ctl"><label for="from">From (date)</label><input type="date" id="from"></div>
+      <div class="ctl"><label for="to">To (date)</label><input type="date" id="to"></div>
+      <div class="ctl"><label>Quick set</label>
+        <div class="presets">
+          <button class="preset" onclick="preset('file')">File dates</button>
+          <button class="preset" onclick="preset('t')">Today</button>
+          <button class="preset" onclick="preset('y')">Yesterday</button>
+          <button class="preset" onclick="preset('3')">Last 3 days</button>
+          <button class="preset" onclick="preset('7')">Last 7 days</button>
+          <button class="preset" onclick="preset('all')">All dates</button>
+        </div>
+      </div>
+      <div class="win-note" id="win-note"></div>
+    </div>
+
+    <div class="prop-filter" id="prop-filter"></div>
+    <div class="tabs" id="tabs"></div>
+    <div id="view"></div>
+
+    <button id="analyze-btn" onclick="runAI()">Analyse this view with AI — revenue manager briefing ↗</button>
+    <div class="ai-box hidden" id="ai-box">
+      <div class="ai-label">AI summary</div>
+      <div class="ai-text" id="ai-text"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+let allRows=[];
+let currentProp='ALL';
+let viewMode='dash';            // dash | pickup | cancel | all
+let dashGroup='channel';        // dashboard split: channel | month | staydate
+let dashScope='pickup';         // dashboard scope: pickup | all
+let tableStyle='compact';       // compact | full
+let fromUTC=null, toUTC=null;   // numeric Date.UTC of window bounds (null = open)
+let fileCreatedRange=null;      // [minUTC,maxUTC] of created dates in file
+
+/* ===================== PROPERTY NAMES ===================== */
+const PROP_CODE_MAP={
+  '6KP':'KP','HARROW':'DOH',
+  'ANTIGALLICAN':'ANTIGAL','ANTIG':'ANTIGAL','THE ANTIGALLICAN':'ANTIGAL','DAG':'ANTIGAL',
+  'BRONDBRY':'BRONDESBURY','CARLYLE':'CARLYSLE',
+  'GCH':'CLARIDGE','GEP':'ECCLESTON','GKY':'KINGSYARD',
+  'CAR':'CARLYSLE','WAR':'WARWICK','CF':'COURTFIELD','DBP':'BRONDESBURY','DTH':'HAYDON',
+  'REG':'REGENCY','MAD':'MADDOX','EGE':'EGERTON','CLA':'CLARIDGE','BAK':'BAKERY',
+  'HER':'HERMES','HAR':'DOH','ECC':'ECCLESTON','KY':'KINGSYARD','KGY':'KINGSYARD'
+};
+function normProp(code){const c=(code||'').trim().toUpperCase();return PROP_CODE_MAP[c]||c;}
+
+/* ===================== DISTRIBUTION ===================== */
+const NEW_DIST_PROPS=new Set(['CARLYSLE','ANTIGAL']);   // ---- EDIT to change new-dist properties ----
+function distFor(prop){return NEW_DIST_PROPS.has(prop)?'NEW':'OLD';}
+
+/* ===================== 2026 MONTHLY BUDGET ADR (info only) ===================== */
+const ADR_BUDGET_2026={
+  'KP':{1:102,2:105,3:121,4:138,5:157,6:166,7:171,8:144,9:147,10:143,11:151,12:162},
+  'CARLYSLE':{1:322,2:300,3:354,4:442,5:503,6:635,7:703,8:607,9:500,10:420,11:423,12:534},
+  'WARWICK':{1:92,2:98,3:116,4:124,5:144,6:160,7:155,8:138,9:146,10:141,11:130,12:148},
+  'COURTFIELD':{1:135,2:133,3:143,4:168,5:185,6:213,7:226,8:177,9:196,10:176,11:160,12:191},
+  'BRONDESBURY':{1:97,2:95,3:110,4:101,5:104,6:117,7:122,8:104,9:126,10:118,11:115,12:124},
+  'HAYDON':{1:102,2:102,3:112,4:124,5:129,6:150,7:167,8:130,9:148,10:135,11:131,12:142},
+  'REGENCY':{1:197,2:188,3:220,4:290,5:305,6:360,7:385,8:315,9:295,10:294,11:266,12:305},
+  'MADDOX':{1:290,2:275,3:288,4:418,5:430,6:481,7:490,8:475,9:385,10:427,11:450,12:505},
+  'BAKERY':{1:100,2:100,3:110,4:120,5:129,6:142,7:152,8:127,9:120,10:116,11:112,12:128},
+  'HERMES':{1:89,2:87,3:95,4:102,5:112,6:133,7:142,8:128,9:121,10:116,11:107,12:123},
+  'DOH':{1:88,2:87,3:97,4:95,5:106,6:123,7:131,8:113,9:121,10:121,11:109,12:116},
+  'CLARIDGE':{1:550,2:540,3:610,4:705,5:755,6:707,7:997,8:664,9:613,10:595,11:536,12:616},
+  'ECCLESTON':{1:215,2:210,3:240,4:272,5:295,6:291,7:415,8:353,9:261,10:254,11:228,12:279},
+  'KINGSYARD':{1:370,2:365,3:410,4:465,5:500,6:643,7:707,8:529,9:496,10:479,11:475,12:479},
+  'ANTIGAL':{1:92,2:90,3:98,4:106,5:116,6:138,7:147,8:132,9:125,10:120,11:111,12:127}
+};
+function getBudgetADR(prop,arr){if(!arr)return null;const c=ADR_BUDGET_2026[prop];if(!c)return null;const v=c[arr.getUTCMonth()+1];return typeof v==='number'?v:null;}
+
+/* ===================== UNIT TIER (0 Studio/1BD · 1 2BD · 2 3-4BD) ===================== */
+function unitTierIdx(u){
+  const s=(u||'').toLowerCase();
+  if(/\b[34]\s*bed|\b[34]\s*(bd|br)\b|three\s*bed|four\s*bed/.test(s))return 2;
+  if(/\b2\s*bed|\b2\s*(bd|br)\b|two\s*bed/.test(s))return 1;
+  return 0;
+}
+const TIER_NAME=['Studio/1BD','2BD','3-4BD'];
+
+/* ===================== SEASONS (OLD dist) ===================== */
+const HIGH_SEASON_MONTHS=[5,6,7,8,9];                   // ---- EDIT high-season months; rest = LOW ----
+function seasonFor(d){if(!d)return 'LOW';return HIGH_SEASON_MONTHS.includes(d.getUTCMonth()+1)?'HIGH':'LOW';}
+
+/* ===================== CANCELLATION POLICY ===================== */
+const NRF_ALWAYS=99999;
+const CXL_CODE_DAYS={'Flex 24H':1,'Flex 3D':3,'SemiFlex 7D':7,'SemiFlex 14D':14,'NONREF':NRF_ALWAYS};
+const OLD_CXL_MATRIX={
+  LOW:{
+    'Flexible':['Flex 24H','Flex 24H','Flex 3D'],
+    '2N':['Flex 24H','Flex 24H','Flex 3D'],
+    '3N':['Flex 3D','Flex 3D','Flex 3D'],
+    '5N':['Flex 3D','Flex 3D','Flex 3D'],
+    '7N':['Flex 3D','SemiFlex 7D','SemiFlex 7D'],
+    '14N':['SemiFlex 7D','SemiFlex 14D','SemiFlex 14D'],
+    'Midterm':['SemiFlex 14D','SemiFlex 14D','SemiFlex 14D'],
+    'NRF':['NONREF','NONREF','NONREF']
+  },
+  HIGH:{
+    'Flexible':['Flex 24H','Flex 24H','Flex 3D'],
+    '2N':['Flex 24H','Flex 24H','Flex 3D'],
+    '3N':['Flex 3D','Flex 3D','Flex 3D'],
+    '5N':['Flex 3D','SemiFlex 7D','SemiFlex 7D'],
+    '7N':['SemiFlex 7D','SemiFlex 7D','SemiFlex 14D'],
+    '14N':['SemiFlex 7D','SemiFlex 14D','SemiFlex 14D'],
+    'Midterm':['SemiFlex 14D','SemiFlex 14D','SemiFlex 14D'],
+    'NRF':['NONREF','NONREF','NONREF']
+  }
+};
+function otaBracket(rp){
+  const m=(rp||'').match(/ota(semi)?los\s*0*(\d+)/i);
+  if(!m)return null;
+  const semi=!!m[1],n=parseInt(m[2]);
+  let min,max;
+  if(n===1){min=1;max=1;}else if(n===2){min=2;max=2;}
+  else if(n===3){min=3;max=6;}else if(n===7){min=7;max=13;}
+  else if(n===14){min=14;max=9999;}else return null;
+  return {min,max,n,semi,label:(semi?'OTASEMILOS':'OTALOS')+n};
+}
+function newCxlDays(rp,idx){
+  const o=otaBracket(rp);if(!o)return null;
+  const big=idx>=1;
+  if(o.semi)return big?56:28;
+  const map={1:[1,3],2:[1,3],3:[3,7],7:[7,14],14:[14,28]};
+  const e=map[o.n];if(!e)return null;
+  return big?e[1]:e[0];
+}
+function cxlPolicy(row){
+  const prop=normProp(g(row,'Property code'));
+  const idx=unitTierIdx(getUnitType(row));
+  const rp=g(row,'Rate plan');
+  if(distFor(prop)==='NEW'){
+    const days=newCxlDays(rp,idx);
+    if(days==null)return null;
+    return {days,code:(otaBracket(rp)?.semi?'OTASEMILOS':'OTALOS')+' ('+days+'d)',dist:'NEW',tier:idx};
+  }
+  const season=seasonFor(getArrivalDate(row));
+  const rule=getRule(rp);
+  if(!rule)return null;
+  const matRow=(OLD_CXL_MATRIX[season]||OLD_CXL_MATRIX.LOW)[rule.label];
+  if(!matRow)return null;
+  const code=matRow[idx];
+  return {days:CXL_CODE_DAYS[code],code,dist:'OLD',season,tier:idx};
+}
+/* Verdict for a cancelled booking */
+function cancelVerdict(row){
+  const pol=cxlPolicy(row);
+  if(!pol)return {kind:'unknown',text:'Rate plan / policy not recognised — check manually',pol:null};
+  const arr=getArrivalDate(row);
+  if(!arr)return {kind:'unknown',text:'No arrival date — check manually',pol};
+  const cd=getCancelDate(row);
+  const gross=parseFloat(row['Gross amount'])||0;
+  if(pol.days>=NRF_ALWAYS)
+    return {kind:'charge',pol,arr,cd,gross,deadline:null,nrf:true,note:'Non-refundable — 100% due'};
+  const deadline=new Date(arr.getTime()-pol.days*86400000);
+  let chargeable,note;
+  if(!cd){chargeable=true;note='no cancellation date in file — review';}
+  else chargeable=cd.getTime()>deadline.getTime();
+  if(chargeable)return {kind:'charge',pol,arr,cd,gross,deadline,nrf:false,note};
+  return {kind:'within',pol,arr,cd,gross,deadline,nrf:false};
+}
+
+/* ===================== DATE / FIELD HELPERS =====================
+   v14 FIX: the workbook is read WITHOUT cellDates, so Excel dates arrive as
+   raw serial numbers and are converted straight to UTC — the exact date
+   stored in the file, in any timezone. (v13 used cellDates:true, which
+   produced local-time Dates that the UTC-based formatting shifted back a
+   day — e.g. bookings created 1 JUL displayed as 30 JUN in London.)      */
+function toDateObj(val){
+  if(val===null||val===undefined||val==='')return null;
+  if(typeof val==='number'){const d=new Date(Math.round((val-25569)*86400*1000));return isNaN(d)?null:d;}
+  if(val instanceof Date){                       // safety net if a Date sneaks in: rebuild from LOCAL parts
+    if(isNaN(val))return null;
+    return new Date(Date.UTC(val.getFullYear(),val.getMonth(),val.getDate(),val.getHours(),val.getMinutes(),val.getSeconds()));
+  }
+  if(typeof val==='string'&&val.trim()){
+    const s=val.trim();
+    let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);              // ISO
+    if(m)return new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0)));
+    m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})(?:[ ,]+(\d{1,2}):(\d{2}))?$/);               // dd/mm/yyyy (UK)
+    if(m){let y=+m[3];if(y<100)y+=2000;return new Date(Date.UTC(y,+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0)));}
+    const d=new Date(s);
+    return isNaN(d)?null:new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate(),d.getHours(),d.getMinutes()));
+  }
+  return null;
+}
+const MONTHS_SHORT=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function fmtDate(d){if(!d)return '—';return d.getUTCDate()+' '+MONTHS_SHORT[d.getUTCMonth()]+' '+d.getUTCFullYear();}
+function dOnly(d){return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());}
+function inWindow(d){if(!d)return false;const x=dOnly(d);if(fromUTC!==null&&x<fromUTC)return false;if(toUTC!==null&&x>toUTC)return false;return true;}
+function getDateVal(row,...keys){for(const k of keys){if(row[k]!==undefined&&row[k]!==null&&row[k]!==''){const d=toDateObj(row[k]);if(d)return d;}}return null;}
+function calcLOS(row){
+  const arr=getDateVal(row,'Arrival','Check in date'),dep=getDateVal(row,'Departure','Check out date');
+  if(arr&&dep){const n=Math.round((dep.getTime()-arr.getTime())/86400000);if(n>0)return n;}
+  return parseInt(row['Number of days'])||0;
+}
+function getArrivalDate(row){return getDateVal(row,'Arrival','Check in date');}
+function getDepartureDate(row){return getDateVal(row,'Departure','Check out date');}
+function getCancelDate(row){return getDateVal(row,'Cancellation date','Cancelled at','Cancellation Date','Cancelled date');}
+function getCreatedDate(row){return getDateVal(row,'Created at','Created','Booked at','Creation date','Booking date');}
+function getUnitType(row){return row['Unit group']||row['Assigned unit group']||row['unit group']||'';}
+const AIRBNB_PG=['airbnb','plum guide','plumguide','homeaway','vrbo'];
+function isAirbnbOrPG(row){return AIRBNB_PG.some(c=>((row['Source']||'')+(row['Channel']||'')).toLowerCase().includes(c));}
+function isCancelled(row){const st=(g(row,'Status')||'').toLowerCase();if(/cancel/.test(st))return true;return !!getCancelDate(row);}
+
+/* ===================== RATE PLAN RULES ===================== */
+const RULES=[
+  {pattern:/\b2\s*n(ight)?/i,label:'2N',min:2,max:2},
+  {pattern:/\b3\s*n(ight)?/i,label:'3N',min:3,max:4},
+  {pattern:/\b5\s*n(ight)?/i,label:'5N',min:5,max:6},
+  {pattern:/\b7\s*n(ight)?/i,label:'7N',min:7,max:13},
+  {pattern:/\b14\s*n(ight)?/i,label:'14N',min:14,max:27},
+  {pattern:/mid.?term|midterm|\bmt\b|\bxs\b/i,label:'Midterm',min:28,max:9999},
+  {pattern:/non.?ref|nrf|nonref/i,label:'NRF',min:3,max:13},
+  {pattern:/flexible/i,label:'Flexible',min:1,max:1},
+];
+function getRule(rp){const o=otaBracket(rp);if(o)return o;if(!rp)return null;for(const r of RULES)if(r.pattern.test(rp))return r;return null;}
+function isExtension(c){return /\bextension\b|\bextended\b|\bextend\b/i.test(c);}
+function isComp(row){const seg=(row&&row['Market segment'])||'';return /compliment|complimentary|\bcomp\b/i.test(seg);}
+function isMismatch(row){
+  const rp=row['Rate plan']||'',los=calcLOS(row);
+  if(isExtension(row['Comment']||'')||isComp(row))return false;
+  const rule=getRule(rp);if(!rule)return false;
+  if(rule.label==='3N'&&isAirbnbOrPG(row))return false;
+  return los<rule.min||los>rule.max;
+}
+function gbp(v){if(v===''||v===null||v===undefined)return '—';return '£'+Number(v).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function gbp0(v){if(v===''||v===null||v===undefined)return '—';return '£'+Number(v).toLocaleString('en-GB',{minimumFractionDigits:0,maximumFractionDigits:0});}
+function g(row,key){const v=row[key];return(v===null||v===undefined)?'':String(v);}
+function bid(r){return g(r,'ID')||g(r,'Booking ID')||g(r,'Reservation ID')||'—';}
+function guestOf(r){return (g(r,'First name')+' '+g(r,'Last name')).trim()||'—';}
+
+/* ===================== ROW SELECTORS ===================== */
+function propRows(){return currentProp==='ALL'?allRows:allRows.filter(r=>normProp(g(r,'Property code'))===currentProp);}
+function pickupRows(){return propRows().filter(r=>inWindow(getCreatedDate(r)));}
+function cancelRows(){return propRows().filter(r=>isCancelled(r)&&inWindow(getCancelDate(r)));}
+function activeRows(){return viewMode==='pickup'?pickupRows():viewMode==='cancel'?cancelRows():propRows();}
+
+/* ===================== FILE PARSING ===================== */
+function parseFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    /* v14: NO cellDates — dates stay as raw Excel serials and toDateObj()
+       converts them straight to UTC. This is what fixes the one-day shift. */
+    const wb=XLSX.read(e.target.result,{type:'array'});
+    allRows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+    document.getElementById('upload-area').classList.add('hidden');
+    document.getElementById('results').classList.remove('hidden');
+    document.getElementById('file-name-label').textContent=file.name;
+    // property filter buttons, with booking counts
+    const counts={};
+    allRows.forEach(r=>{const p=normProp(g(r,'Property code'));if(p)counts[p]=(counts[p]||0)+1;});
+    const props=['ALL',...Object.keys(counts)].sort((a,b)=>a==='ALL'?-1:b==='ALL'?1:a.localeCompare(b));
+    document.getElementById('prop-filter').innerHTML=props.map(p=>{
+      const tag=p==='ALL'?'':`<span class="dist-tag">${distFor(p)} · ${counts[p]}</span>`;
+      return `<button class="prop-btn ${p==='ALL'?'active':''}" data-prop="${p}" onclick="setProp('${p}')">${p}${tag}</button>`;
+    }).join('');
+    // file coverage note + smart default window
+    const created=allRows.map(getCreatedDate).filter(Boolean).map(dOnly);
+    const cancels=allRows.filter(isCancelled).map(getCancelDate).filter(Boolean).map(dOnly);
+    const rangeTxt=ds=>{if(!ds.length)return '—';const mn=new Date(Math.min(...ds)),mx=new Date(Math.max(...ds));return mn.getTime()===mx.getTime()?fmtDate(mn):fmtDate(mn)+' → '+fmtDate(mx);};
+    document.getElementById('coverage').innerHTML=
+      `File coverage — <strong>created:</strong> ${rangeTxt(created)} · <strong>cancellations:</strong> ${rangeTxt(cancels)} · ${allRows.length} rows`;
+    if(created.length){
+      fileCreatedRange=[Math.min(...created),Math.max(...created)];
+      preset('file');   // default window = the file's own creation dates (never opens empty)
+    }else{
+      fileCreatedRange=null;
+      preset('all');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function setProp(p){
+  currentProp=p;
+  document.querySelectorAll('.prop-btn').forEach(b=>b.classList.toggle('active',b.dataset.prop===p));
+  render();
+}
+function setView(m){viewMode=m;render();}
+
+/* ===================== DATE WINDOW ===================== */
+function ymdLocal(d){const z=new Date(d.getTime()-d.getTimezoneOffset()*60000);return z.toISOString().slice(0,10);}
+function ymdUTCms(ms){return new Date(ms).toISOString().slice(0,10);}
+function preset(kind){
+  const today=new Date();
+  let from,to;
+  if(kind==='all'){from='';to='';}
+  else if(kind==='file'){
+    if(!fileCreatedRange){from='';to='';}
+    else{from=ymdUTCms(fileCreatedRange[0]);to=ymdUTCms(fileCreatedRange[1]);}
+  }
+  else if(kind==='t'){from=to=ymdLocal(today);}
+  else if(kind==='y'){const d=new Date(today);d.setDate(d.getDate()-1);from=to=ymdLocal(d);}
+  else {const n=parseInt(kind);const t=new Date(today);t.setDate(t.getDate()-1);const f=new Date(today);f.setDate(f.getDate()-n);from=ymdLocal(f);to=ymdLocal(t);}
+  document.getElementById('from').value=from;
+  document.getElementById('to').value=to;
+  applyDates();
+}
+function applyDates(){
+  const fv=document.getElementById('from').value, tv=document.getElementById('to').value;
+  fromUTC = fv?Date.UTC(+fv.slice(0,4),+fv.slice(5,7)-1,+fv.slice(8,10)):null;
+  toUTC   = tv?Date.UTC(+tv.slice(0,4),+tv.slice(5,7)-1,+tv.slice(8,10)):null;
+  render();
+}
+
+/* ===================== RENDER ===================== */
+function render(){
+  // window note
+  const wn=document.getElementById('win-note');
+  if(fromUTC===null&&toUTC===null) wn.textContent='Showing all dates';
+  else{
+    const f=fromUTC!==null?fmtDate(new Date(fromUTC)):'start';
+    const t=toUTC!==null?fmtDate(new Date(toUTC)):'end';
+    wn.textContent=(f===t)?('Window: '+f):('Window: '+f+' → '+t);
+  }
+  // tabs
+  const pc=pickupRows().length, cc=cancelRows().length, ac=propRows().length;
+  const chargeDue=cancelRows().map(cancelVerdict).filter(v=>v.kind==='charge').length;
+  document.getElementById('tabs').innerHTML=`
+    <button class="tab ${viewMode==='dash'?'active':''}" onclick="setView('dash')">Dashboard</button>
+    <button class="tab ${viewMode==='pickup'?'active':''}" onclick="setView('pickup')">Pickup<span class="count">${pc}</span></button>
+    <button class="tab ${viewMode==='cancel'?'active':''} ${chargeDue>0?'alert':''}" onclick="setView('cancel')">Cancellations<span class="count">${cc}</span></button>
+    <button class="tab ${viewMode==='all'?'active':''}" onclick="setView('all')">All bookings<span class="count">${ac}</span></button>`;
+  const st=document.getElementById('style-toggle');
+  if(st){st.style.display=viewMode==='dash'?'none':'';st.textContent=tableStyle==='compact'?'Show full detail':'Show compact view';}
+  if(viewMode==='dash')renderDashboard();
+  else if(viewMode==='pickup')renderPickup();
+  else if(viewMode==='cancel')renderCancellations();
+  else renderAllTab();
+}
+
+function statCard(label,val,cls){return `<div class="stat ${cls||''}"><div class="stat-label">${label}</div><div class="stat-val ${cls==='leak'&&val!=='0'&&val!=='£0'?'red':''}">${val}</div></div>`;}
+
+/* ---- PICKUP ---- */
+function renderPickup(){
+  const rows=pickupRows();
+  const gross=rows.reduce((s,r)=>s+(parseFloat(r['Gross amount'])||0),0);
+  const nights=rows.reduce((s,r)=>s+calcLOS(r),0);
+  const adr=nights>0?gross/nights:0;
+  const wrong=rows.filter(isMismatch);
+  let h=`<div class="stat-grid">
+    ${statCard('New bookings',rows.length)}
+    ${statCard('Picked-up revenue',gbp(gross))}
+    ${statCard('Nights picked up',nights)}
+    ${statCard('Pickup ADR',gbp(adr))}
+    <div class="stat ${wrong.length?'leak':''}"><div class="stat-label">Wrong rate plans</div><div class="stat-val ${wrong.length?'red':''}">${wrong.length}</div></div>
+  </div>`;
+  if(wrong.length){
+    h+=`<div class="section-title leak">Wrong rate plans in this pickup (${wrong.length})</div>`;
+    h+=wrong.map(r=>{const rule=getRule(g(r,'Rate plan'));const los=calcLOS(r);
+      return flagCard('orange','Wrong rate plan',`${guestOf(r)} — ${normProp(g(r,'Property code'))} · ${getUnitType(r)||'—'}`,
+        `On "${g(r,'Rate plan')}" (valid ${rule?.min}–${rule?.max===9999?'∞':rule?.max}N) but LOS is ${los}N. Fix the plan in Apaleo.`,
+        `${bid(r)} · ${g(r,'Source')||g(r,'Channel')} · ${fmtDate(getArrivalDate(r))} → ${fmtDate(getDepartureDate(r))}`,null);
+    }).join('');
+  }
+  // per-property summary when viewing ALL properties
+  if(currentProp==='ALL'&&rows.length){
+    const by={};rows.forEach(r=>{const p=normProp(g(r,'Property code'));(by[p]=by[p]||[]).push(r);});
+    const props=Object.keys(by).sort();
+    if(props.length>1){
+      h+=`<div class="section-title">Pickup by property</div>`;
+      h+=`<div class="tbl-wrap"><table><thead><tr><th>Property</th><th>Bookings</th><th>Nights</th><th>Revenue</th><th>ADR</th><th>Wrong plans</th></tr></thead><tbody>`;
+      h+=props.map(p=>{
+        const rs=by[p];
+        const gr=rs.reduce((s,r)=>s+(parseFloat(r['Gross amount'])||0),0);
+        const n=rs.reduce((s,r)=>s+calcLOS(r),0);
+        const w=rs.filter(isMismatch).length;
+        return `<tr><td><strong>${p}</strong></td><td>${rs.length}</td><td>${n}</td><td style="font-weight:500">${gbp(gr)}</td><td>${gbp(n>0?gr/n:0)}</td><td>${w?`<span class="pill wrong">${w}</span>`:'0'}</td></tr>`;
+      }).join('');
+      h+=`</tbody></table></div>`;
+    }
+  }
+  h+=`<div class="section-title">Bookings picked up (${rows.length})</div>`;
+  if(tableStyle==='compact'){h+=compactPickupTable(rows);document.getElementById('view').innerHTML=h;return;}
+  h+=`<div class="tbl-wrap"><table><thead><tr>
+    <th>Property</th><th>Booking ID</th><th>Guest</th><th>Channel</th><th>Rate plan</th><th>Dist</th>
+    <th>Created</th><th>Arrival</th><th>Departure</th><th>Unit type</th><th>ADR</th><th>Budget ADR</th><th>vs Budget</th>
+    <th>Gross</th><th>LOS</th><th>Status</th><th>Plan check</th></tr></thead><tbody>`;
+  h+= rows.length?rows.map(r=>{
+    const los=calcLOS(r),grs=parseFloat(r['Gross amount'])||0,adrR=los>0?grs/los:0;
+    const prop=normProp(g(r,'Property code')),unit=getUnitType(r),mm=isMismatch(r);
+    const b=getBudgetADR(prop,getArrivalDate(r));
+    let vb='—';if(b!=null&&los>0&&grs>0){const p=Math.round(((adrR-b)/b)*100);const cls=Math.abs(p)<=2?'match':(p>0?'above':'below');vb=`<span class="pill ${cls}">${p>=0?'+':''}${p}%</span>`;}
+    return `<tr class="${mm?'mismatch-row':''}">
+      <td><strong>${prop}</strong></td><td class="mono">${bid(r)}</td><td>${guestOf(r)}</td>
+      <td>${g(r,'Source')||g(r,'Channel')}</td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis" title="${g(r,'Rate plan')}">${g(r,'Rate plan')||'—'}</td>
+      <td><span class="pill ${distFor(prop).toLowerCase()}">${distFor(prop)}</span></td>
+      <td>${fmtDate(getCreatedDate(r))}</td><td>${fmtDate(getArrivalDate(r))}</td><td>${fmtDate(getDepartureDate(r))}</td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis" title="${unit}">${unit||'—'}</td>
+      <td style="font-weight:500">${gbp(adrR)}</td><td style="color:var(--nestor-muted)">${b!=null?gbp0(b):'—'}</td><td>${vb}</td>
+      <td style="font-weight:500">${gbp(grs)}</td><td style="font-weight:600">${los}N</td><td>${g(r,'Status')}</td>
+      <td>${mm?'<span class="pill wrong">Wrong plan</span>':'<span style="color:var(--nestor-green)">✓ OK</span>'}</td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="17" class="empty">No bookings created in this window — check the coverage line above, then widen the window or hit “File dates”.</td></tr>`;
+  h+=`</tbody></table></div>`;
+  document.getElementById('view').innerHTML=h;
+}
+
+/* ---- CANCELLATIONS ---- */
+function renderCancellations(){
+  const rows=cancelRows();
+  const verdicts=rows.map(r=>({r,v:cancelVerdict(r)}));
+  const charge=verdicts.filter(x=>x.v.kind==='charge');
+  const within=verdicts.filter(x=>x.v.kind==='within');
+  const unknown=verdicts.filter(x=>x.v.kind==='unknown');
+  const atRisk=charge.reduce((s,x)=>s+(x.v.gross||0),0);
+  const cancelledRev=rows.reduce((s,r)=>s+(parseFloat(r['Gross amount'])||0),0);
+  let h=`<div class="stat-grid">
+    ${statCard('Cancellations',rows.length)}
+    <div class="stat good"><div class="stat-label">Within terms</div><div class="stat-val green">${within.length}</div></div>
+    <div class="stat leak"><div class="stat-label">Outside terms (charge)</div><div class="stat-val ${charge.length?'red':''}">${charge.length}</div></div>
+    <div class="stat leak"><div class="stat-label">Revenue to recover</div><div class="stat-val ${atRisk?'red':''}">${gbp0(atRisk)}</div></div>
+    ${statCard('Cancelled revenue',gbp0(cancelledRev))}
+    ${unknown.length?`<div class="stat"><div class="stat-label">Need manual check</div><div class="stat-val">${unknown.length}</div></div>`:''}
+  </div>`;
+  if(charge.length){
+    h+=`<div class="section-title leak">Charge due — cancelled outside policy terms (${charge.length}) · recover ${gbp0(atRisk)}</div>`;
+    h+=charge.map(({r,v})=>flagCard('danger','Charge due',
+      `${guestOf(r)} — ${normProp(g(r,'Property code'))} · ${getUnitType(r)||'—'}`,
+      `Cancelled ${v.nrf?'on a non-refundable plan':'inside the free-cancellation window'} → <strong>100% due (${gbp(v.gross)})</strong>. ${v.pol.dist} dist · ${TIER_NAME[v.pol.tier]}${v.pol.season?' · '+v.pol.season+' season':''} · policy ${v.pol.code}${v.deadline?` (free until ${fmtDate(v.deadline)})`:''}. ${v.note?'<em>'+v.note+'</em>. ':''}Make sure the charge was captured in Apaleo.`,
+      `${bid(r)} · ${g(r,'Source')||g(r,'Channel')} · arr ${fmtDate(v.arr)} · cancelled ${fmtDate(v.cd)}`,
+      gbp0(v.gross))).join('');
+  }else if(rows.length){
+    h+=`<div class="section-title" style="color:var(--nestor-green)">No charges to recover — every cancellation in this window was within terms ✓</div>`;
+  }
+  h+=`<div class="section-title">All cancellations in window (${rows.length})</div>`;
+  if(tableStyle==='compact'){h+=compactCancelTable(verdicts);document.getElementById('view').innerHTML=h;return;}
+  h+=`<div class="tbl-wrap"><table><thead><tr>
+    <th>Property</th><th>Booking ID</th><th>Guest</th><th>Channel</th><th>Rate plan</th><th>Dist</th><th>Unit type</th><th>Tier</th>
+    <th>Arrival</th><th>Cancelled</th><th>Free until</th><th>Policy</th><th>Gross</th><th>Verdict</th></tr></thead><tbody>`;
+  h+= rows.length?verdicts.map(({r,v})=>{
+    const prop=normProp(g(r,'Property code'));
+    const rowClass=v.kind==='charge'?'leak-row':v.kind==='within'?'within-row':'';
+    let verdictCell, freeUntil, policy, tier;
+    if(v.kind==='unknown'){verdictCell=`<span class="pill unknown">Check manually</span>`;freeUntil='—';policy='—';tier='—';}
+    else{
+      tier=TIER_NAME[v.pol.tier];
+      policy=v.pol.code;
+      freeUntil=v.nrf?'<span style="color:var(--nestor-red)">Non-refundable</span>':fmtDate(v.deadline);
+      verdictCell=v.kind==='charge'?`<span class="pill charge">Charge due ${gbp0(v.gross)}</span>`:`<span class="pill within">Within terms</span>`;
+    }
+    return `<tr class="${rowClass}">
+      <td><strong>${prop}</strong></td><td class="mono">${bid(r)}</td><td>${guestOf(r)}</td>
+      <td>${g(r,'Source')||g(r,'Channel')}</td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis" title="${g(r,'Rate plan')}">${g(r,'Rate plan')||'—'}</td>
+      <td><span class="pill ${distFor(prop).toLowerCase()}">${distFor(prop)}</span></td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${getUnitType(r)}">${getUnitType(r)||'—'}</td>
+      <td>${tier}</td>
+      <td>${fmtDate(getArrivalDate(r))}</td><td>${fmtDate(getCancelDate(r))}</td><td>${freeUntil}</td><td>${policy}</td>
+      <td style="font-weight:500">${gbp(parseFloat(r['Gross amount'])||0)}</td><td>${verdictCell}</td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="14" class="empty">No cancellations in this window — check the coverage line above (cancellations often land on the export day, so try “Today”).</td></tr>`;
+  h+=`</tbody></table></div>`;
+  document.getElementById('view').innerHTML=h;
+}
+
+/* ---- ALL ---- */
+function renderAllTab(){
+  const rows=propRows();
+  const gross=rows.reduce((s,r)=>s+(parseFloat(r['Gross amount'])||0),0);
+  const nights=rows.reduce((s,r)=>s+calcLOS(r),0);
+  const adr=nights>0?gross/nights:0;
+  const wrong=rows.filter(isMismatch).length;
+  let h=`<div class="stat-grid">
+    ${statCard('Bookings in file',rows.length)}
+    ${statCard('Total revenue',gbp(gross))}
+    ${statCard('Blended ADR',gbp(adr))}
+    ${statCard('Total nights',nights)}
+    <div class="stat ${wrong?'leak':''}"><div class="stat-label">Wrong rate plans</div><div class="stat-val ${wrong?'red':''}">${wrong}</div></div>
+  </div>`;
+  h+=`<div class="section-title">All bookings in file (${rows.length})</div>`;
+  if(tableStyle==='compact'){h+=compactAllTable(rows);document.getElementById('view').innerHTML=h;return;}
+  h+=`<div class="tbl-wrap"><table><thead><tr>
+    <th>Property</th><th>Booking ID</th><th>Guest</th><th>Channel</th><th>Rate plan</th><th>Dist</th>
+    <th>Created</th><th>Arrival</th><th>Departure</th><th>Cxl date</th><th>Unit type</th><th>ADR</th><th>Gross</th><th>LOS</th><th>Status</th></tr></thead><tbody>`;
+  h+= rows.length?rows.map(r=>{
+    const los=calcLOS(r),grs=parseFloat(r['Gross amount'])||0,adrR=los>0?grs/los:0;
+    const prop=normProp(g(r,'Property code')),mm=isMismatch(r),cancelled=isCancelled(r);
+    return `<tr class="${cancelled?'leak-row':mm?'mismatch-row':''}">
+      <td><strong>${prop}</strong></td><td class="mono">${bid(r)}</td><td>${guestOf(r)}</td>
+      <td>${g(r,'Source')||g(r,'Channel')}</td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis" title="${g(r,'Rate plan')}">${g(r,'Rate plan')||'—'}</td>
+      <td><span class="pill ${distFor(prop).toLowerCase()}">${distFor(prop)}</span></td>
+      <td>${fmtDate(getCreatedDate(r))}</td><td>${fmtDate(getArrivalDate(r))}</td><td>${fmtDate(getDepartureDate(r))}</td>
+      <td style="color:${cancelled?'var(--nestor-red)':'var(--nestor-muted)'}">${fmtDate(getCancelDate(r))}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${getUnitType(r)}">${getUnitType(r)||'—'}</td>
+      <td>${gbp(adrR)}</td><td style="font-weight:500">${gbp(grs)}</td><td style="font-weight:600">${los}N</td><td>${g(r,'Status')}</td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="15" class="empty">No bookings.</td></tr>`;
+  h+=`</tbody></table></div>`;
+  document.getElementById('view').innerHTML=h;
+}
+
+function flagCard(type,label,title,detail,meta,amount){
+  return `<div class="flag-card ${type}"><div class="flag-header"><span class="flag-badge ${type}">${label}</span><span class="flag-title">${title}</span>${amount?`<span class="flag-amount">${amount}</span>`:''}</div><div class="flag-detail">${detail}</div><div class="flag-meta">${meta}</div></div>`;
+}
+
+/* ===================== v15 — DASHBOARD & COMPACT TABLES ===================== */
+function toggleStyle(){tableStyle=tableStyle==='compact'?'full':'compact';render();}
+function setDashGroup(m){dashGroup=m;render();}
+function setDashScope(m){dashScope=m;render();}
+function dashRows(){return dashScope==='pickup'?pickupRows():propRows().filter(r=>!isCancelled(r));}
+/* one entry per night of each stay, revenue spread evenly across nights */
+function expandNights(r){
+  const arr=getArrivalDate(r);const los=calcLOS(r);const grs=parseFloat(r['Gross amount'])||0;
+  const out=[];if(!arr||los<=0)return out;
+  const per=grs/los;const prop=normProp(g(r,'Property code'));
+  for(let i=0;i<los;i++)out.push({date:new Date(arr.getTime()+i*86400000),rev:per,prop});
+  return out;
+}
+function vsPill(adr,bud){
+  if(bud==null||bud<=0||!(adr>0))return '—';
+  const pct=Math.round(((adr-bud)/bud)*100);
+  const cls=Math.abs(pct)<=2?'match':(pct>0?'above':'below');
+  return `<span class="pill ${cls}">${pct>=0?'+':''}${pct}%</span>`;
+}
+function dashAgg(rows,mode){
+  const gmap={};
+  const get=(k,label)=>gmap[k]||(gmap[k]={key:k,label,bookings:0,nights:0,rev:0,budSum:0,budNights:0});
+  rows.forEach(r=>{
+    const nightsArr=expandNights(r);
+    if(mode==='channel'){
+      const c=g(r,'Source')||g(r,'Channel')||'Direct / Unknown';
+      const e=get(c,c);e.bookings++;
+      nightsArr.forEach(n=>{e.nights++;e.rev+=n.rev;const b=getBudgetADR(n.prop,n.date);if(b!=null){e.budSum+=b;e.budNights++;}});
+    }else if(mode==='month'){
+      const arr=getArrivalDate(r);
+      if(arr){const k=arr.getUTCFullYear()+'-'+String(arr.getUTCMonth()+1).padStart(2,'0');get(k,MONTHS_SHORT[arr.getUTCMonth()]+' '+arr.getUTCFullYear()).bookings++;}
+      nightsArr.forEach(n=>{
+        const k=n.date.getUTCFullYear()+'-'+String(n.date.getUTCMonth()+1).padStart(2,'0');
+        const e=get(k,MONTHS_SHORT[n.date.getUTCMonth()]+' '+n.date.getUTCFullYear());
+        e.nights++;e.rev+=n.rev;const b=getBudgetADR(n.prop,n.date);if(b!=null){e.budSum+=b;e.budNights++;}
+      });
+    }else if(mode==='unittype'){
+      const u=getUnitType(r)||'No unit type';
+      const e=get(u,u);e.bookings++;
+      nightsArr.forEach(n=>{e.nights++;e.rev+=n.rev;const b=getBudgetADR(n.prop,n.date);if(b!=null){e.budSum+=b;e.budNights++;}});
+    }else{
+      nightsArr.forEach(n=>{
+        const k=n.date.toISOString().slice(0,10);
+        const e=get(k,fmtDate(n.date));
+        e.nights++;e.rev+=n.rev;const b=getBudgetADR(n.prop,n.date);if(b!=null){e.budSum+=b;e.budNights++;}
+      });
+    }
+  });
+  const list=Object.values(gmap);
+  if(mode==='channel'||mode==='unittype')list.sort((a,b)=>b.rev-a.rev);else list.sort((a,b)=>a.key<b.key?-1:1);
+  return list;
+}
+function barCell(v,max){
+  return `<td class="bar-cell"><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:${Math.max(2,Math.round(v/max*100))}%"></div></div><span style="font-weight:500;white-space:nowrap">${gbp0(v)}</span></div></td>`;
+}
+function dashTable(list,mode){
+  if(!list.length)return `<div class="empty">Nothing to show here — widen the date window or hit "File dates".</div>`;
+  const maxRev=Math.max(...list.map(x=>x.rev),1);
+  const firstCol=mode==='channel'?'Channel':mode==='month'?'Month':mode==='unittype'?'Unit type':'Stay date';
+  const showNights=mode!=='staydate';
+  let h=`<div class="tbl-wrap"><table><thead><tr><th>${firstCol}</th><th class="num">${mode==='staydate'?'Units sold':'Bookings'}</th>${showNights?'<th class="num">Nights</th>':''}<th class="bar-cell">Revenue</th><th class="num">ADR</th><th class="num">Budget ADR</th><th>vs Budget</th></tr></thead><tbody>`;
+  list.forEach(x=>{
+    const adr=x.nights>0?x.rev/x.nights:0;
+    const bud=x.budNights>0?x.budSum/x.budNights:null;
+    h+=`<tr><td><strong>${x.label}</strong></td><td class="num">${mode==='staydate'?x.nights:x.bookings}</td>${showNights?`<td class="num">${x.nights}</td>`:''}${barCell(x.rev,maxRev)}<td class="num" style="font-weight:500">${gbp0(adr)}</td><td class="num" style="color:var(--nestor-muted)">${bud!=null?gbp0(bud):'—'}</td><td>${vsPill(adr,bud)}</td></tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  return h;
+}
+function renderDashboard(){
+  const rows=dashRows();
+  const groupName=dashGroup==='channel'?'channel':dashGroup==='month'?'month':dashGroup==='unittype'?'unit type':'stay date';
+  let h=`<div class="dash-controls">
+    <span class="lbl">Show</span>
+    <div class="seg">
+      <button class="${dashScope==='pickup'?'active':''}" onclick="setDashScope('pickup')">Pickup in window</button>
+      <button class="${dashScope==='all'?'active':''}" onclick="setDashScope('all')">All bookings</button>
+    </div>
+    <span class="lbl">Split by</span>
+    <div class="seg">
+      <button class="${dashGroup==='channel'?'active':''}" onclick="setDashGroup('channel')">Channel</button>
+      <button class="${dashGroup==='month'?'active':''}" onclick="setDashGroup('month')">Month</button>
+      <button class="${dashGroup==='staydate'?'active':''}" onclick="setDashGroup('staydate')">Stay date</button>
+      <button class="${dashGroup==='unittype'?'active':''}" onclick="setDashGroup('unittype')">Unit type</button>
+    </div>
+  </div>`;
+  const gross=rows.reduce((s,r)=>s+(parseFloat(r['Gross amount'])||0),0);
+  const nights=rows.reduce((s,r)=>s+calcLOS(r),0);
+  const adr=nights>0?gross/nights:0;
+  let budSum=0,budN=0;
+  rows.forEach(r=>expandNights(r).forEach(n=>{const b=getBudgetADR(n.prop,n.date);if(b!=null){budSum+=b;budN++;}}));
+  const bud=budN>0?budSum/budN:null;
+  h+=`<div class="stat-grid">
+    ${statCard('Bookings',rows.length)}
+    ${statCard('Nights',nights)}
+    ${statCard('Revenue',gbp0(gross))}
+    ${statCard('ADR',gbp(adr))}
+    ${statCard('Budget ADR',bud!=null?gbp0(bud):'—')}
+    <div class="stat"><div class="stat-label">ADR vs budget</div><div class="stat-val">${vsPill(adr,bud)}</div></div>
+  </div>`;
+  if(currentProp==='ALL'){
+    h+=`<div class="section-title">Properties — click one to open its dashboard</div>`;
+    const by={};rows.forEach(r=>{const p=normProp(g(r,'Property code'));(by[p]=by[p]||[]).push(r);});
+    const props=Object.keys(by).sort();
+    if(!props.length){
+      h+=`<div class="empty">No bookings in this window — widen the window or hit "File dates".</div>`;
+      document.getElementById('view').innerHTML=h;return;
+    }
+    const maxRev=Math.max(...props.map(p=>by[p].reduce((s,r)=>s+(parseFloat(r['Gross amount'])||0),0)),1);
+    h+=`<div class="tbl-wrap"><table><thead><tr><th>Property</th><th class="num">Bookings</th><th class="num">Nights</th><th class="bar-cell">Revenue</th><th class="num">ADR</th><th class="num">Budget ADR</th><th>vs Budget</th><th>Top channel</th></tr></thead><tbody>`;
+    props.forEach(p=>{
+      const rs=by[p];
+      const gr=rs.reduce((s,r)=>s+(parseFloat(r['Gross amount'])||0),0);
+      const n=rs.reduce((s,r)=>s+calcLOS(r),0);
+      const a=n>0?gr/n:0;
+      let bs=0,bn=0;rs.forEach(r=>expandNights(r).forEach(x=>{const b=getBudgetADR(x.prop,x.date);if(b!=null){bs+=b;bn++;}}));
+      const bu=bn>0?bs/bn:null;
+      const ch={};rs.forEach(r=>{const c=g(r,'Source')||g(r,'Channel')||'Direct';ch[c]=(ch[c]||0)+(parseFloat(r['Gross amount'])||0);});
+      const top=Object.entries(ch).sort((x,y)=>y[1]-x[1])[0];
+      h+=`<tr class="clickable-row" onclick="setProp('${p}')"><td><strong>${p}</strong></td><td class="num">${rs.length}</td><td class="num">${n}</td>${barCell(gr,maxRev)}<td class="num" style="font-weight:500">${gbp0(a)}</td><td class="num" style="color:var(--nestor-muted)">${bu!=null?gbp0(bu):'—'}</td><td>${vsPill(a,bu)}</td><td>${top?top[0]:'—'}</td></tr>`;
+    });
+    h+=`</tbody></table></div>`;
+    h+=`<div class="section-title">All properties combined — by ${groupName}</div>`;
+    h+=dashTable(dashAgg(rows,dashGroup),dashGroup);
+  }else{
+    h+=`<div class="section-title">${currentProp} — by ${groupName}</div>`;
+    h+=dashTable(dashAgg(rows,dashGroup),dashGroup);
+  }
+  h+=`<div class="dash-note">ADR = revenue ÷ nights. Budget ADR is the 2026 monthly budget, weighted across the nights each stay touches. Month and stay-date views spread each booking's revenue evenly over its nights; the month view counts each booking in its arrival month.</div>`;
+  document.getElementById('view').innerHTML=h;
+}
+/* ---- compact grouped tables ---- */
+function compactPickupTable(rows){
+  if(!rows.length)return `<div class="tbl-wrap"><table><tbody><tr><td class="empty">No bookings created in this window — check the coverage line above, then widen the window or hit "File dates".</td></tr></tbody></table></div>`;
+  const by={};rows.forEach(r=>{const p=normProp(g(r,'Property code'));(by[p]=by[p]||[]).push(r);});
+  let h=`<div class="tbl-wrap"><table><thead><tr><th>Guest</th><th>Channel</th><th>Stay</th><th class="num">LOS</th><th class="num">ADR</th><th class="num">Budget</th><th>vs Budget</th><th class="num">Gross</th><th>Plan check</th></tr></thead><tbody>`;
+  Object.keys(by).sort().forEach(p=>{
+    const rs=by[p];
+    const gr=rs.reduce((s,r)=>s+(parseFloat(r['Gross amount'])||0),0);
+    const n=rs.reduce((s,r)=>s+calcLOS(r),0);
+    h+=`<tr class="grp-head"><td colspan="9"><strong>${p}</strong><span class="grp-sub">${rs.length} booking${rs.length>1?'s':''} · ${n} nights · ${gbp0(gr)} · ADR ${gbp0(n>0?gr/n:0)}</span></td></tr>`;
+    rs.forEach(r=>{
+      const los=calcLOS(r),grs=parseFloat(r['Gross amount'])||0,adrR=los>0?grs/los:0;
+      const mm=isMismatch(r);const b=getBudgetADR(p,getArrivalDate(r));
+      h+=`<tr class="${mm?'mismatch-row':''}"><td>${guestOf(r)}</td><td>${g(r,'Source')||g(r,'Channel')||'—'}</td><td>${fmtDate(getArrivalDate(r))} → ${fmtDate(getDepartureDate(r))}</td><td class="num" style="font-weight:600">${los}N</td><td class="num" style="font-weight:500">${gbp0(adrR)}</td><td class="num" style="color:var(--nestor-muted)">${b!=null?gbp0(b):'—'}</td><td>${vsPill(adrR,b)}</td><td class="num" style="font-weight:500">${gbp(grs)}</td><td>${mm?'<span class="pill wrong">Wrong plan</span>':'<span style="color:var(--nestor-green)">✓ OK</span>'}</td></tr>`;
+    });
+  });
+  h+=`</tbody></table></div>`;
+  return h;
+}
+function compactCancelTable(verdicts){
+  if(!verdicts.length)return `<div class="tbl-wrap"><table><tbody><tr><td class="empty">No cancellations in this window — check the coverage line above (cancellations often land on the export day, so try "Today").</td></tr></tbody></table></div>`;
+  const by={};verdicts.forEach(x=>{const p=normProp(g(x.r,'Property code'));(by[p]=by[p]||[]).push(x);});
+  let h=`<div class="tbl-wrap"><table><thead><tr><th>Guest</th><th>Channel</th><th>Arrival</th><th>Cancelled</th><th>Free until</th><th>Policy</th><th class="num">Gross</th><th>Verdict</th></tr></thead><tbody>`;
+  Object.keys(by).sort().forEach(p=>{
+    const xs=by[p];
+    const due=xs.filter(x=>x.v.kind==='charge').reduce((s,x)=>s+(x.v.gross||0),0);
+    h+=`<tr class="grp-head"><td colspan="8"><strong>${p}</strong><span class="grp-sub">${xs.length} cancellation${xs.length>1?'s':''}${due>0?' · <strong style="color:var(--nestor-red)">recover '+gbp0(due)+'</strong>':' · nothing to recover'}</span></td></tr>`;
+    xs.forEach(({r,v})=>{
+      const rowClass=v.kind==='charge'?'leak-row':v.kind==='within'?'within-row':'';
+      let verdictCell,freeUntil,policy;
+      if(v.kind==='unknown'){verdictCell='<span class="pill unknown">Check manually</span>';freeUntil='—';policy='—';}
+      else{policy=v.pol.code;freeUntil=v.nrf?'<span style="color:var(--nestor-red)">Non-ref</span>':fmtDate(v.deadline);
+        verdictCell=v.kind==='charge'?`<span class="pill charge">Charge due ${gbp0(v.gross)}</span>`:'<span class="pill within">Within terms</span>';}
+      h+=`<tr class="${rowClass}"><td>${guestOf(r)}</td><td>${g(r,'Source')||g(r,'Channel')||'—'}</td><td>${fmtDate(getArrivalDate(r))}</td><td>${fmtDate(getCancelDate(r))}</td><td>${freeUntil}</td><td>${policy}</td><td class="num" style="font-weight:500">${gbp(parseFloat(r['Gross amount'])||0)}</td><td>${verdictCell}</td></tr>`;
+    });
+  });
+  h+=`</tbody></table></div>`;
+  return h;
+}
+function compactAllTable(rows){
+  if(!rows.length)return `<div class="tbl-wrap"><table><tbody><tr><td class="empty">No bookings.</td></tr></tbody></table></div>`;
+  const by={};rows.forEach(r=>{const p=normProp(g(r,'Property code'));(by[p]=by[p]||[]).push(r);});
+  let h=`<div class="tbl-wrap"><table><thead><tr><th>Guest</th><th>Channel</th><th>Created</th><th>Stay</th><th class="num">LOS</th><th class="num">ADR</th><th class="num">Gross</th><th>Status</th></tr></thead><tbody>`;
+  Object.keys(by).sort().forEach(p=>{
+    const rs=by[p];
+    const gr=rs.reduce((s,r)=>s+(parseFloat(r['Gross amount'])||0),0);
+    const n=rs.reduce((s,r)=>s+calcLOS(r),0);
+    h+=`<tr class="grp-head"><td colspan="8"><strong>${p}</strong><span class="grp-sub">${rs.length} booking${rs.length>1?'s':''} · ${n} nights · ${gbp0(gr)}</span></td></tr>`;
+    rs.forEach(r=>{
+      const los=calcLOS(r),grs=parseFloat(r['Gross amount'])||0;
+      const cancelled=isCancelled(r),mm=isMismatch(r);
+      h+=`<tr class="${cancelled?'leak-row':mm?'mismatch-row':''}"><td>${guestOf(r)}</td><td>${g(r,'Source')||g(r,'Channel')||'—'}</td><td>${fmtDate(getCreatedDate(r))}</td><td>${fmtDate(getArrivalDate(r))} → ${fmtDate(getDepartureDate(r))}</td><td class="num" style="font-weight:600">${los}N</td><td class="num">${gbp0(los>0?grs/los:0)}</td><td class="num" style="font-weight:500">${gbp(grs)}</td><td>${g(r,'Status')}</td></tr>`;
+    });
+  });
+  h+=`</tbody></table></div>`;
+  return h;
+}
+
+/* ===================== CSV EXPORT ===================== */
+function csvEsc(v){v=(v===null||v===undefined)?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function exportCSV(){
+  const rows=activeRows();
+  const cols=['Property','Booking ID','Guest','Channel','Rate plan','Dist','Created','Arrival','Departure','Cancellation date','Unit type','LOS','Gross','ADR','Status'];
+  const lines=[cols.join(',')];
+  rows.forEach(r=>{
+    const los=calcLOS(r),grs=parseFloat(r['Gross amount'])||0;
+    const prop=normProp(g(r,'Property code'));
+    lines.push([prop,bid(r),guestOf(r),g(r,'Source')||g(r,'Channel'),g(r,'Rate plan'),distFor(prop),
+      fmtDate(getCreatedDate(r)),fmtDate(getArrivalDate(r)),fmtDate(getDepartureDate(r)),fmtDate(getCancelDate(r)),
+      getUnitType(r),los,grs.toFixed(2),(los>0?grs/los:0).toFixed(2),g(r,'Status')].map(csvEsc).join(','));
+  });
+  const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='nestor_'+viewMode+'_'+currentProp+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+
+/* ===================== AI BRIEFING ===================== */
+function getAIKey(){
+  let key='';
+  try{key=localStorage.getItem('nestor_ai_key')||'';}catch(e){}
+  if(!key){
+    key=(prompt('Paste your Anthropic API key (starts with sk-ant-…). It is stored only in this browser, never sent anywhere except api.anthropic.com.')||'').trim();
+    if(key){try{localStorage.setItem('nestor_ai_key',key);}catch(e){}}
+  }
+  return key;
+}
+async function runAI(){
+  const rows=activeRows();
+  const btn=document.getElementById('analyze-btn');
+  const key=getAIKey();
+  if(!key){document.getElementById('ai-box').classList.remove('hidden');document.getElementById('ai-text').textContent='No API key provided — AI briefing needs an Anthropic API key.';return;}
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Analysing...';
+  document.getElementById('ai-box').classList.remove('hidden');
+  document.getElementById('ai-text').textContent='';
+  const win=document.getElementById('win-note').textContent;
+  let payload;
+  if(viewMode==='cancel'){
+    const v=rows.map(r=>({r,v:cancelVerdict(r)}));
+    payload={view:'CANCELLATIONS',window:win,property:currentProp,total:rows.length,
+      chargeDue:v.filter(x=>x.v.kind==='charge').map(({r,v})=>({guest:guestOf(r),property:normProp(g(r,'Property code')),ratePlan:g(r,'Rate plan'),unitTier:TIER_NAME[v.pol.tier],dist:v.pol.dist,season:v.pol.season||null,policy:v.pol.code,nonRefundable:v.nrf,arrival:fmtDate(v.arr),cancelled:fmtDate(v.cd),freeUntil:v.deadline?fmtDate(v.deadline):null,amountDue:Math.round(v.gross)})),
+      withinTerms:v.filter(x=>x.v.kind==='within').length,
+      needCheck:v.filter(x=>x.v.kind==='unknown').length,
+      revenueToRecover:Math.round(v.filter(x=>x.v.kind==='charge').reduce((s,x)=>s+(x.v.gross||0),0))};
+  }else{
+    const gross=rows.reduce((s,r)=>s+(parseFloat(r['Gross amount'])||0),0);
+    const nights=rows.reduce((s,r)=>s+calcLOS(r),0);
+    const ch={};rows.forEach(r=>{const c=g(r,'Source')||g(r,'Channel')||'Unknown';ch[c]=(ch[c]||0)+1;});
+    payload={view:viewMode==='pickup'?'PICKUP':'ALL',window:win,property:currentProp,bookings:rows.length,
+      revenue:Math.round(gross),adr:nights>0?Math.round(gross/nights):0,nights,channels:ch,
+      wrongRatePlans:rows.filter(isMismatch).map(r=>({guest:guestOf(r),property:normProp(g(r,'Property code')),ratePlan:g(r,'Rate plan'),actualLOS:calcLOS(r),unitType:getUnitType(r),gross:parseFloat(r['Gross amount'])||0}))};
+  }
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,
+        system:`You are a revenue manager assistant for NESTOR (London serviced apartments). You receive ONE view at a time (PICKUP, CANCELLATIONS, or ALL) for a date window.
+If view=CANCELLATIONS: lead with the cancellations cancelled OUTSIDE policy terms — list each guest/property/amount and total revenueToRecover, and tell Nat to confirm the charge was captured in Apaleo. Then note within-terms count and any needing manual check. This is the priority — money lost if not charged.
+If view=PICKUP: summarise the new business picked up (count, revenue, ADR, channel mix) and flag any wrong rate plans to fix.
+Distributions: CARLYSLE & THE ANTIGALLICAN = NEW (OTALOS/OTASEMILOS); others = OLD. Be direct, specific, use £, under 250 words. Do not discuss ADR vs budget.`,
+        messages:[{role:'user',content:JSON.stringify(payload,null,2)}]})
+    });
+    const d=await resp.json();
+    if(resp.status===401){try{localStorage.removeItem('nestor_ai_key');}catch(e){}
+      document.getElementById('ai-text').textContent='API key rejected (401) — it has been cleared. Click Analyse again to enter a new key.';}
+    else document.getElementById('ai-text').textContent=d.content?.map(c=>c.text||'').join('\n')||('No response.'+(d.error?' ('+d.error.message+')':''));
+  }catch(err){document.getElementById('ai-text').textContent='Error: '+err.message;}
+  btn.disabled=false;btn.innerHTML='Analyse this view with AI — revenue manager briefing ↗';
+}
+
+function resetTool(){
+  allRows=[];currentProp='ALL';viewMode='dash';dashGroup='channel';dashScope='pickup';tableStyle='compact';fromUTC=toUTC=null;fileCreatedRange=null;
+  document.getElementById('upload-area').classList.remove('hidden');
+  document.getElementById('results').classList.add('hidden');
+  document.getElementById('file-input').value='';
+  document.getElementById('ai-box').classList.add('hidden');
+}
+
+document.getElementById('from').addEventListener('change',applyDates);
+document.getElementById('to').addEventListener('change',applyDates);
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)parseFile(f)});
+document.getElementById('file-input').addEventListener('change',e=>{const f=e.target.files[0];if(f)parseFile(f)});
+</script>
+</body>
+</html>
