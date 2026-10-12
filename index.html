@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nestor — Pickup &amp; Cancellation Control</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%231E4155"/><text x="50" y="71" text-anchor="middle" font-family="Georgia,serif" font-size="62" font-weight="600" fill="white">n</text></svg>'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#1E4155;--brand-soft:#DEE9EF;--brand-ink:#12303F;--brand-hover:#2E5B79;
+  --bg:#F4F7F9;--surface:#FFFFFF;--surface-alt:#EDF2F5;--line:#D8E2E8;--line-soft:#E6EDF1;
+  --ink:#16303F;--ink-soft:#41586A;--muted:#7C8E9A;
+  --orange:#C66B2E;--orange-soft:#F4E1CF;--orange-ink:#8A4A1F;
+  --green:#2F6E4E;--green-soft:#DCEADF;--red:#A8362A;--red-soft:#F4D9D2;
+  --amber:#B6841A;--amber-soft:#F6E6BF;--info:#2E5B8C;--info-soft:#DBE7F4;
+  --display:'Playfair Display',Georgia,serif;
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+  --r-sm:6px;--r-md:10px;--r-lg:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{padding:28px 24px 64px}
+.page{max-width:1280px;margin:0 auto}
+.hidden{display:none!important}
+
+/* brand */
+.brand-bar{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--brand);padding-bottom:14px;margin-bottom:22px;gap:12px}
+.brand-left{display:flex;align-items:center;gap:14px}
+.brand-mono{width:44px;height:44px;flex:0 0 44px}
+.brand-word{font-family:var(--display);font-weight:600;font-size:30px;letter-spacing:1px;color:var(--brand);line-height:1}
+.brand-tag{font-size:11.5px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:5px}
+.brand-sub{font-size:11.5px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;text-align:right}
+.brand-sub strong{display:block;color:var(--brand-ink);font-size:13px;letter-spacing:1.5px}
+
+/* buttons */
+button{font-family:var(--sans);font-size:13.5px;font-weight:500;background:var(--brand);color:#fff;border:none;border-radius:var(--r-md);padding:9px 15px;cursor:pointer;transition:background .15s}
+button:hover{background:var(--brand-hover)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.ghost:hover{background:var(--surface-alt);color:var(--brand);border-color:var(--brand)}
+
+/* upload */
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.uz{background:var(--surface);border:1.5px dashed var(--brand);border-radius:var(--r-lg);padding:30px 22px;text-align:center;cursor:pointer;transition:background .15s}
+.uz:hover{background:var(--surface-alt)}
+.uz.drag{background:var(--brand-soft)}
+.uz.loaded{border-style:solid;border-color:var(--green);background:#F7FBF8}
+.uz-step{display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--brand);color:#fff;font-weight:600;align-items:center;justify-content:center;font-size:13px;margin-bottom:10px}
+.uz.loaded .uz-step{background:var(--green)}
+.uz-label{font-family:var(--display);font-size:20px;font-weight:600;margin-bottom:4px}
+.uz-sub{font-size:13px;color:var(--muted)}
+.uz-file{margin-top:12px;font-size:13px;font-weight:500;color:var(--ink-soft)}
+.uz.loaded .uz-file{color:var(--green)}
+.upload-actions{display:flex;align-items:center;gap:14px;margin-top:16px;flex-wrap:wrap}
+.upload-actions .hint{font-size:12.5px;color:var(--muted)}
+#open-btn{padding:12px 26px;font-size:14.5px;font-weight:600}
+
+/* toolbar */
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.files-line{font-size:12px;color:var(--muted);font-family:var(--mono);line-height:1.75}
+.files-line strong{color:var(--brand-ink);font-weight:600}
+.toolbar .actions{display:flex;gap:8px;flex-wrap:wrap}
+.warn-bar{background:var(--amber-soft);border-left:4px solid var(--amber);border-radius:var(--r-sm);padding:8px 13px;font-size:13px;color:#6B4D0F;margin:6px 0}
+
+/* controls */
+.controls{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;margin:10px 0}
+.ctl{display:flex;flex-direction:column;gap:4px}
+.ctl label{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.ctl input[type=date]{font-family:var(--sans);font-size:13.5px;padding:7px 9px;border:1px solid var(--line);border-radius:var(--r-sm);color:var(--ink);background:var(--surface)}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+.preset{font-size:12px;padding:6px 11px;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:999px}
+.preset:hover{background:var(--surface-alt);color:var(--brand-ink);border-color:var(--brand)}
+.win-note{font-size:13px;color:var(--brand-ink);margin-left:auto;align-self:center;font-weight:600}
+
+/* property chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.chip{font-size:12.5px;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink-soft);font-weight:500}
+.chip:hover{border-color:var(--brand);color:var(--brand-ink);background:var(--surface)}
+.chip.active{background:var(--brand);color:#fff;border-color:var(--brand);font-weight:600}
+.chip .n{opacity:.65;margin-left:5px;font-size:11px}
+
+/* tabs */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-top:10px}
+.tab{padding:10px 18px;font-weight:600;font-size:14px;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;border-radius:0}
+.tab:hover{color:var(--brand-ink);background:none}
+.tab.active{color:var(--ink);border-bottom-color:var(--brand)}
+.tab .count{display:inline-block;margin-left:7px;font-size:11.5px;background:var(--surface-alt);border:1px solid var(--line);color:var(--ink-soft);border-radius:999px;padding:0 8px}
+.tab.alert .count{background:var(--red-soft);border-color:var(--red-soft);color:var(--red)}
+
+/* action list */
+.todo{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:4px 0;margin:16px 0}
+.todo-item{display:flex;align-items:center;gap:12px;padding:9px 16px;font-size:14px}
+.todo-item+.todo-item{border-top:1px solid var(--line-soft)}
+.todo-item .go{margin-left:auto;font-size:12px;color:var(--brand);font-weight:600;background:none;padding:4px 8px;white-space:nowrap}
+.todo-item .go:hover{background:var(--surface-alt)}
+.todo-ok{color:var(--green);font-weight:600}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 15px}
+.kpi.red{border-left:4px solid var(--red)}
+.kpi.green{border-left:4px solid var(--green)}
+.kpi.navy{border-left:4px solid var(--brand)}
+.kpi-l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;font-weight:600}
+.kpi-v{font-family:var(--display);font-size:25px;font-weight:600;line-height:1.15}
+.kpi-v.red{color:var(--red)}.kpi-v.green{color:var(--green)}
+.kpi-s{font-size:12.5px;color:var(--ink-soft);margin-top:4px}
+
+/* sections & tables */
+.sec{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:22px 0 8px}
+.sec h3{font-family:var(--display);font-size:17px;font-weight:600}
+.sec h3.red{color:var(--red)}.sec h3.orange{color:var(--orange-ink)}.sec h3.amber{color:var(--amber)}
+.tw{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);font-weight:600;color:var(--muted);white-space:nowrap;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;background:var(--surface-alt)}
+td{padding:8px 11px;border-bottom:1px solid var(--line-soft);white-space:nowrap;font-size:13.5px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#F8FAFB}
+.num{text-align:right}
+.sub{display:block;font-size:11.5px;color:var(--muted);font-weight:400;margin-top:1px}
+.mono{font-family:var(--mono);font-size:11px}
+.b{font-weight:600}
+.muted{color:var(--muted)}
+.trunc{display:inline-block;max-width:210px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.wrap{white-space:normal;min-width:220px}
+td.pol{white-space:normal;min-width:130px;max-width:200px}
+.grp td{background:var(--brand-soft)!important;font-size:12.5px;padding:7px 11px;border-top:1px solid #c9d8e1}
+.grp .gs{margin-left:10px;color:var(--ink-soft)}
+tr.click{cursor:pointer}
+tr.r-red td{background:rgba(244,217,210,.42)}
+tr.r-orange td{background:rgba(244,225,207,.45)}
+tr.total td{font-weight:600;border-top:2px solid var(--line);background:var(--surface-alt)}
+.empty{font-size:13.5px;color:var(--muted);padding:16px}
+
+/* pills */
+.pill{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:999px;font-weight:600;white-space:nowrap}
+.p-up{background:var(--green-soft);color:var(--green)}
+.p-down{background:var(--red-soft);color:var(--red)}
+.p-flat{background:var(--info-soft);color:var(--info)}
+.p-red{background:var(--red-soft);color:var(--red)}
+.p-orange{background:var(--orange-soft);color:var(--orange-ink)}
+.p-amber{background:var(--amber-soft);color:#7a5810}
+.p-grey{background:var(--surface-alt);color:var(--muted);border:1px solid var(--line)}
+.ok{color:var(--green);font-weight:600}
+
+/* bars */
+.bar{display:flex;align-items:center;gap:8px;min-width:200px}
+.bar-t{position:relative;flex:1;background:var(--surface-alt);border-radius:4px;height:14px;min-width:80px;overflow:hidden}
+.bar-f{position:absolute;top:0;bottom:0;left:0;background:var(--brand);border-radius:4px;opacity:.85}
+.bar-v{font-weight:600;min-width:64px;text-align:right}
+.bar-p{font-size:11.5px;color:var(--muted);min-width:32px;text-align:right}
+
+/* segmented */
+.seg{display:inline-flex;background:var(--surface-alt);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px}
+.seg button{background:none;color:var(--ink-soft);border-radius:999px;padding:5px 13px;font-size:12.5px}
+.seg button:hover{background:var(--surface);color:var(--brand-ink)}
+.seg button.active{background:var(--brand);color:#fff;font-weight:600}
+
+/* month → unit detail */
+.caret{display:inline-block;border-left:5px solid var(--muted);border-top:4px solid transparent;border-bottom:4px solid transparent;margin-right:8px;transition:transform .15s;vertical-align:middle}
+.caret.open{transform:rotate(90deg)}
+.ud-cell{padding:0!important;background:var(--surface-alt)!important}
+.ud{padding:4px 14px 12px 30px}
+.ud table{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm)}
+.ud th{background:transparent}
+
+/* folds & rules */
+details.fold{margin-top:14px}
+details.fold>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--ink-soft);padding:8px 2px;list-style:none}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::before{content:'▸ ';color:var(--muted)}
+details.fold[open]>summary::before{content:'▾ '}
+.rules{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:2px 16px 12px;margin-top:28px;font-size:13px;color:var(--ink-soft)}
+.rules ul{margin:4px 0 10px 18px;line-height:1.75}
+.rules table{width:100%;margin:0;border:none}
+.rules td,.rules th{padding:5px 10px;font-size:12px}
+.rules th .sub{font-size:10px;letter-spacing:0;text-transform:none}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+
+/* AI */
+.ai-row{margin-top:12px}
+.ai-box{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:var(--r-md);padding:14px 18px;margin-top:12px;font-size:14px;line-height:1.7;white-space:pre-wrap}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(30,65,85,.25);border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (max-width:820px){body{padding:18px 12px 48px}.upload-grid{grid-template-columns:1fr}.brand-word{font-size:24px}.win-note{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="brand-bar">
+    <div class="brand-left">
+      <svg class="brand-mono" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Nestor logo">
+        <circle cx="50" cy="50" r="50" fill="#1E4155"/>
+        <text x="50" y="71" text-anchor="middle" font-family="'Playfair Display',Georgia,serif" font-size="62" font-weight="600" fill="#FFFFFF">n</text>
+      </svg>
+      <div>
+        <div class="brand-word">nestor.</div>
+        <div class="brand-tag">Pickup &amp; Cancellation Control</div>
+      </div>
+    </div>
+    <div class="brand-sub">Revenue Management<strong>v20</strong></div>
+  </header>
+
+  <!-- ============ UPLOAD ============ -->
+  <section id="upload-area">
+    <div class="upload-grid">
+      <div class="uz" id="uz-created">
+        <div class="uz-step">1</div>
+        <div class="uz-label">Reservations created</div>
+        <div class="uz-sub">Apaleo export filtered on <strong>created</strong> date</div>
+        <div class="uz-file" id="uzf-created">Drop file or click · .xlsx / .csv</div>
+      </div>
+      <div class="uz" id="uz-cancelled">
+        <div class="uz-step">2</div>
+        <div class="uz-label">Reservations cancelled</div>
+        <div class="uz-sub">Apaleo export filtered on <strong>cancellation</strong> date</div>
+        <div class="uz-file" id="uzf-cancelled">Drop file or click · .xlsx / .csv</div>
+      </div>
+    </div>
+    <input type="file" id="fi-created" accept=".xlsx,.xls,.csv" hidden>
+    <input type="file" id="fi-cancelled" accept=".xlsx,.xls,.csv" hidden>
+    <div class="upload-actions">
+      <button id="open-btn" disabled>Open tracker</button>
+      <span class="hint">One file is enough to start. Without a cancellation file, cancellations are read from the creation file.</span>
+    </div>
+    <div id="upload-warns"></div>
+  </section>
+
+  <!-- ============ RESULTS ============ -->
+  <section id="results" class="hidden">
+    <div class="toolbar">
+      <div class="files-line" id="files-line"></div>
+      <div class="actions">
+        <button class="ghost" id="btn-export">Export CSV</button>
+        <button class="ghost" id="btn-files">Change files</button>
+      </div>
+    </div>
+    <div id="warns"></div>
+    <div class="controls">
+      <div class="ctl"><label for="from">From</label><input type="date" id="from"></div>
+      <div class="ctl"><label for="to">To</label><input type="date" id="to"></div>
+      <div class="ctl"><label>Quick set</label>
+        <div class="presets">
+          <button class="preset" data-act="preset" data-preset="file">File dates</button>
+          <button class="preset" data-act="preset" data-preset="y">Yesterday</button>
+          <button class="preset" data-act="preset" data-preset="t">Today</button>
+          <button class="preset" data-act="preset" data-preset="7">Last 7 days</button>
+          <button class="preset" data-act="preset" data-preset="mtd">Month to date</button>
+          <button class="preset" data-act="preset" data-preset="all">All</button>
+        </div>
+      </div>
+      <div class="win-note" id="win-note"></div>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="tabs" id="tabs"></div>
+    <div id="view"></div>
+    <details class="rules fold" id="rules"></details>
+    <div class="ai-row"><button class="ghost" id="btn-ai">AI briefing of this view (optional · uses your API key)</button></div>
+    <div class="ai-box hidden" id="ai-box"></div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+/* =====================================================================
+   NESTOR — Pickup & Cancellation Control · v17
+   SETTINGS — everything you may need to change lives in this block.
+   ===================================================================== */
+
+/* 1 · Channels that reach Apaleo NET of commission.
+       Shown as gross-equivalent = net ÷ NET_FACTOR (raw net kept underneath). */
+const NET_FACTOR = 0.835;
+const NET_CHANNEL_RX = /expedia|hyper\s*-?guest/i;
+
+/* 2 · Cancellation terms come from the APALEO block at the bottom of this script
+       (snapshot of every rate plan → cancellation policy, per property and unit type).
+       Late cancellation = 100% of the stay value. Channel overrides win over Apaleo: */
+const CHANNEL_CXL_OVERRIDE = [ {rx:/airbnb/i, hours:14*24, label:'Airbnb · 14d'} ];   // hardcoded: every Airbnb booking = 14 days, whatever the Apaleo plan
+/*     Deadline = arrival day at CHECKIN_TIME minus the policy period (same time for every property).
+       Cancellations this close to the deadline (minutes) go to manual check. */
+const CHECKIN_TIME = '15:00';
+const DEADLINE_TOLERANCE_MIN = 60;
+/*     Comments that mark a hotel-initiated cancellation (overbooking / relocation) — never charged. */
+const HOTEL_CXL_RX = /\bovb\b|over-?book|relocat/i;
+
+/* 3 · Stay length each LOS code is valid for (nights). */
+const LOS_BRACKET = {1:[1,1], 2:[2,2], 3:[3,6], 7:[7,13], 14:[14,9999]};
+/*     Channels that map every stay to one plan (no LOS check), and plans with no LOS rule. */
+const LOS_EXEMPT_CHANNEL_RX = /airbnb|plum\s*guide|vrbo|homeaway/i;
+const LOS_EXEMPT_PLAN_RX = /^(AGENCY|EXTENDED)/;
+/*     Plans whose code doesn't carry the LOS but are the live LOS plan (Antigallican LOS3 kept on the old code). */
+const LOS_ALIAS = {ANTIGAL:{'3NFLEX':3,'3NFLEXOTA':3}};
+
+/* 4 · Budget ADR — year → property → [Jan … Dec]. Add 2027 when it is set. */
+const ADR_BUDGET = {
+  2026:{
+    'KP':         [102,105,121,138,157,166,171,144,147,143,151,162],
+    'CARLYLE':    [322,300,354,442,503,635,703,607,500,420,423,534],
+    'WARWICK':    [ 92, 98,116,124,144,160,155,138,146,141,130,148],
+    'COURTFIELD': [135,133,143,168,185,213,226,177,196,176,160,191],
+    'BRONDESBURY':[ 97, 95,110,101,104,117,122,104,126,118,115,124],
+    'HAYDON':     [102,102,112,124,129,150,167,130,148,135,131,142],
+    'REGENCY':    [197,188,220,290,305,360,385,315,295,294,266,305],
+    'MADDOX':     [290,275,288,418,430,481,490,475,385,427,450,505],
+    'BAKERY':     [100,100,110,120,129,142,152,127,120,116,112,128],
+    'HERMES':     [ 89, 87, 95,102,112,133,142,128,121,116,107,123],
+    'DOH':        [ 88, 87, 97, 95,106,123,131,113,121,121,109,116],
+    'CLARIDGE':   [550,540,610,705,755,707,997,664,613,595,536,616],
+    'ECCLESTON':  [215,210,240,272,295,291,415,353,261,254,228,279],
+    'KINGSYARD':  [370,365,410,465,500,643,707,529,496,479,475,479],
+    'ANTIGAL':    [null,null,null,null,null,null,110,102,104,101, 89,102],
+    'CHENISTON':  [null,null,null,null,null,null,140,150,185,189,176,203],
+    'BOURNE':     [null,null,null,null,null,null,329,306,332,285,258,321]   // derived: budget revenue ÷ (85% occ × 6 units × days) — sheet ADR row blank
+  }
+};
+
+/* 5 · Property code in the export → name used in the tool (unlisted codes are shown as they are). */
+const PROP_CODE_MAP = {
+  '6KP':'KP','HARROW':'DOH','HAR':'DOH',
+  'ANTIGALLICAN':'ANTIGAL','THE ANTIGALLICAN':'ANTIGAL','ANTIG':'ANTIGAL','DAG':'ANTIGAL',
+  'CAR':'CARLYLE','CARLYLE':'CARLYLE','CARLYSLE':'CARLYLE',
+  'WAR':'WARWICK','CF':'COURTFIELD','DBP':'BRONDESBURY','BRONDBRY':'BRONDESBURY',
+  'DTH':'HAYDON','REG':'REGENCY','MAD':'MADDOX','EGE':'EGERTON','BAK':'BAKERY','DLR':'BAKERY',
+  'HER':'HERMES','CLA':'CLARIDGE','GCH':'CLARIDGE','ECC':'ECCLESTON','GEP':'ECCLESTON',
+  'KY':'KINGSYARD','KGY':'KINGSYARD','GKY':'KINGSYARD',
+  'GPR':'BOURNE','CHE':'CHENISTON'
+};
+/*     Tool name → Apaleo property ID (used to find the cancellation policy). */
+const APALEO_ID = {KP:'6KP',DOH:'HARROW',CARLYLE:'CARLYSLE',BRONDESBURY:'BRONDBRY',HAYDON:'DTH'};
+/* ===================================================================== */
+
+
+/* ---------------- basics ---------------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const DAY=86400000;
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const THIS_YEAR=new Date().getFullYear();
+const LEAD_B=[[0,3,'0–3 days'],[4,7,'4–7 days'],[8,14,'8–14 days'],[15,30,'15–30 days'],[31,60,'31–60 days'],[61,90,'61–90 days'],[91,1e9,'91+ days']];
+const gbp=v=>'£'+Math.round(v||0).toLocaleString('en-GB');
+const money=v=>(v<-0.5?'−':'')+gbp(Math.abs(v));
+const plural=(n,w)=>n+' '+w+(n===1?'':'s');
+function minmax(arr){let a=Infinity,b=-Infinity;for(const x of arr){if(x<a)a=x;if(x>b)b=x;}return arr.length?[a,b]:null;}
+
+/* ---------------- dates ----------------
+   Excel dates are read as raw serials and turned straight into UTC, so the
+   day shown is exactly the day stored in the export (no timezone shift).  */
+function toDateObj(val){
+  if(val===null||val===undefined||val==='')return null;
+  if(typeof val==='number'){if(val<1)return null;const d=new Date(Math.round((val-25569)*DAY));return isNaN(d)?null:d;}
+  if(val instanceof Date){if(isNaN(val))return null;return new Date(Date.UTC(val.getFullYear(),val.getMonth(),val.getDate(),val.getHours(),val.getMinutes(),val.getSeconds()));}
+  const s=String(val).trim();if(!s)return null;
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);                 // ISO
+  if(m)return new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0)));
+  m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})(?:[ ,T]+(\d{1,2}):(\d{2}))?/);                  // dd/mm/yyyy (UK)
+  if(m){let y=+m[3];if(y<100)y+=2000;return new Date(Date.UTC(y,+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0)));}
+  if(/^\d+(\.\d+)?$/.test(s))return toDateObj(parseFloat(s));
+  const d=new Date(s);return isNaN(d)?null:new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate(),d.getHours(),d.getMinutes()));
+}
+const dOnly=d=>Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());
+const dayDiff=(a,b)=>Math.round((dOnly(a)-dOnly(b))/DAY);
+function fd(d){if(!d)return '—';const y=d.getUTCFullYear();return d.getUTCDate()+' '+MON[d.getUTCMonth()]+(y!==THIS_YEAR?' ’'+String(y).slice(2):'');}
+function fdy(d){return d?d.getUTCDate()+' '+MON[d.getUTCMonth()]+' '+d.getUTCFullYear():'—';}
+const hhmm=d=>String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0');
+const hasTime=d=>!!d&&(d.getUTCHours()!==0||d.getUTCMinutes()!==0);
+function fdt(d){return d?fd(d)+(hasTime(d)?' '+hhmm(d):''):'—';}
+function hrsTxt(h){if(h==null)return '—';if(h<0)return 'Non-refundable';if(h<72&&h%24)return h+'h';return h<72?h+'h':Math.round(h/24)+'d';}
+const isoD=d=>d?new Date(dOnly(d)).toISOString().slice(0,10):'';
+
+/* ---------------- column detection ---------------- */
+const FIELDS={
+  id:['ID','Reservation ID','Reservation Id','Booking ID','Id'],
+  prop:['Property code','Property Code','Property'],
+  status:['Status','Reservation status'],
+  created:['Created at','Created','Booked at','Creation date','Booking date'],
+  cancelTime:['Cancellation time'],
+  cancel:['Cancellation date','Cancelled at','Canceled at','Cancelled date'],
+  balance:['Balance'],
+  arr:['Arrival','Arrival date','Check in date'],
+  dep:['Departure','Departure date','Check out date'],
+  nights:['Number of days','Nights','Number of nights'],
+  plan:['Rate plan','Rate plan name','Rate plan code','Rateplan'],
+  cxlpol:['Cancellation policy','Cancellation fee','Cancellation policy code','Cancellation policy name','Cancellation fee code'],
+  unit:['Unit group','Assigned unit group','Unit group name'],
+  gross:['Gross amount','Total gross amount','Total amount','Gross'],
+  seg:['Market segment'],
+  comment:['Comment','Comments'],
+  first:['First name','Firstname'],last:['Last name','Lastname'],guest:['Guest','Guest name','Primary guest','Booker'],
+  source:['Source'],channel:['Channel','Channel code'],subch:['Sub channel','Subchannel']
+};
+const LABEL={created:'Created at',cancel:'Cancellation date',arr:'Arrival',dep:'Departure',plan:'Rate plan',gross:'Gross amount',prop:'Property code',unit:'Unit group'};
+function headerMap(headers){
+  const low={};headers.forEach(h=>{if(h)low[h.toLowerCase()]=h;});
+  const m={};
+  for(const k in FIELDS){for(const a of FIELDS[k]){if(low[a.toLowerCase()]!==undefined){m[k]=low[a.toLowerCase()];break;}}}
+  return m;
+}
+function num(v){if(typeof v==='number')return v;const n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n;}
+function normProp(c){c=String(c||'').trim().toUpperCase();return PROP_CODE_MAP[c]||c;}
+
+/* ---------------- rate plans & cancellation policy (from Apaleo) ----------------
+   The export's “Rate plan” cell can be a code (OTALOS3), a rate plan ID
+   (CAR-OTALOS3-1BD) or a name (“Free Cancellation 7 days in advance”).
+   Unit group can be a code (STU) or a name (“Studio”). All are resolved
+   against the APALEO snapshot; the policy is never guessed from unit size. */
+const normTxt=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+function apaleoProp(raw,disp){
+  const c=String(raw||'').trim().toUpperCase();
+  if(APALEO.PLAN[c])return c;
+  const id=APALEO_ID[disp]||disp;
+  return APALEO.PLAN[id]?id:null;
+}
+function ugCodes(ap,raw){
+  if(!ap||!raw)return [];
+  const all=new Set(Object.values(APALEO.UGN[ap]||{}).flat());
+  const up=String(raw).trim().toUpperCase();
+  if(all.has(up))return [up];
+  if(up.startsWith(ap+'-')&&all.has(up.slice(ap.length+1)))return [up.slice(ap.length+1)];
+  return (APALEO.UGN[ap]||{})[normTxt(raw)]||[];
+}
+function planCodes(ap,raw){
+  if(!ap||!raw)return {codes:[],ug:null};
+  const plans=APALEO.PLAN[ap],up=String(raw).trim().toUpperCase();
+  if(plans[up])return {codes:[up],ug:null};
+  const parts=up.split('-');                                   // PROPERTY-CODE-UNITGROUP
+  if(parts.length>=2&&plans[parts[1]])return {codes:[parts[1]],ug:parts.length>2?parts.slice(2).join('-'):null};
+  const byName=(APALEO.NAMES[ap]||{})[normTxt(raw)]||[];
+  const nd=byName.filter(c=>/LOSS?\d+$|^(AGENCY|EXTENDED)/.test(c)||(LOS_ALIAS[ap]||{})[c]);   // a name shared with legacy plans → current (new-distribution) plans win
+  return {codes:nd.length?nd:byName,ug:null};
+}
+function policyHours(ap,pol){const h=(APALEO.POL[ap]||{})[pol];return h==null?null:h;}
+function resolvePolicy(r){
+  const ap=r.ap;
+  if(!ap)return {err:`Property “${r.propRaw||'—'}” not in the Apaleo snapshot`};
+  if(r.cxlpolRaw){                                              // policy column in the export wins
+    const up=r.cxlpolRaw.trim().toUpperCase(),code=up.startsWith(ap+'-')?up.slice(ap.length+1):up;
+    let h=policyHours(ap,code);
+    if(h==null){const n=(APALEO.POLN[ap]||{})[normTxt(r.cxlpolRaw)];if(n!=null)h=n;}
+    if(h!=null)return {hours:h,label:code+' · '+(h<0?'non-ref':hrsTxt(h))+' (export)'};
+  }
+  const pc={...r._plan};
+  if(!pc.codes.length)return {err:`Rate plan “${r.plan||'—'}” not found in Apaleo for ${r.prop}`};
+  if(pc.codes.length>1&&r.los){                                 // a shared name (e.g. “Free cancellation”) → narrow by stay length
+    const fit=pc.codes.filter(c=>{const g=losRange(c,ap)||legacyRange(c);return g&&r.los>=g[0]&&r.los<=g[1];});
+    if(fit.length)pc.codes=fit;
+  }
+  const ugs=pc.ug?[pc.ug]:r._ug;
+  const hs=new Set();
+  pc.codes.forEach(c=>{
+    const v=APALEO.PLAN[ap][c];
+    if(typeof v==='string'){hs.add(policyHours(ap,v));return;}
+    const pick=ugs.filter(u=>v[u]);
+    (pick.length?pick.map(u=>v[u]):Object.values(v)).forEach(p=>hs.add(policyHours(ap,p)));
+  });
+  hs.delete(null);
+  const fams=[...new Set(pc.codes.map(c=>c.replace(/LOSS?\d+$/,'').replace(/(LOYALTY|LOAYLATY|PROMO)$/,'')))];
+  const label=pc.codes.length===1?pc.codes[0]:fams.length<=2?fams.join('/'):r.plan;
+  if(hs.size===1){const h=[...hs][0];return {hours:h,label:label+' · '+(h<0?'non-ref':hrsTxt(h))};}
+  if(!hs.size)return {err:`No cancellation policy found for “${r.plan}”`};
+  const opts=[...hs].sort((a,b)=>a-b).map(h=>h<0?'NRF':hrsTxt(h)).join(' or ');
+  if(pc.codes.length>1)return {err:`“${r.plan}” matches ${pc.codes.length} Apaleo plans with different terms (${opts}) — check the booking`,label};
+  return {err:`Apaleo policy depends on the unit type (${opts}) — unit type not matched`,label};
+}
+function legacyRange(code){                                    // old ladder: 1N flexible · 2N · 3–4N · 5–6N · 7–13N · 14–27N · midterm 28N+
+  let m=code.match(/^(\d+)N/);if(m)return {2:[2,2],3:[3,4],5:[5,6],7:[7,13],14:[14,27]}[+m[1]]||null;
+  if(/^MIDTERM/.test(code))return [28,9999];
+  if(/^(FLEX|MEMBERFLEX)/.test(code))return [1,1];
+  return null;
+}
+function losRange(code,ap){
+  const al=(LOS_ALIAS[ap]||{})[code];
+  if(al)return LOS_BRACKET[al];
+  const m=code.match(/LOSS?(\d{1,2})$/);
+  if(!m||!LOS_BRACKET[+m[1]])return null;
+  return LOS_BRACKET[+m[1]];
+}
+const bracketTxt=([a,b])=>b>=9999?a+'N+':(a===b?a+'N':a+'–'+b+'N');
+const isExt=c=>/\bextension\b|\bextended\b|\bextend\b/i.test(c||'');
+const isComp=s=>/compliment|\bcomp\b/i.test(s||'');
+function budgetADR(prop,d){const y=ADR_BUDGET[d.getUTCFullYear()];if(!y||!y[prop])return null;const v=y[prop][d.getUTCMonth()];return typeof v==='number'?v:null;}
+function nightsOf(r){if(!r.arr||r.los<=0)return [];const per=r.rev/r.los,a=dOnly(r.arr),out=[];for(let i=0;i<r.los;i++)out.push({d:new Date(a+i*DAY),rev:per});return out;}
+
+/* ---------------- cancellation verdict ---------------- */
+function cxlVerdict(r){
+  const v=cxlVerdictCore(r);
+  if(r.balance<-0.5){
+    if(v.kind==='within'||HOTEL_CXL_RX.test(r.comment))v.note=(v.note?v.note+' · ':'')+`Apaleo balance −${gbp(-r.balance)} open — clear it`;
+    else if(v.kind==='charge')v.note=(v.note?v.note+' · ':'')+`Apaleo balance −${gbp(-r.balance)} to collect`;
+  }
+  if(HOTEL_CXL_RX.test(r.comment))return {...v,kind:'hotel',reason:'Hotel-initiated (overbooking / relocation in comment)'};
+  if(v.kind==='charge'&&r.rev<0.5)return {...v,kind:'check',reason:'Outside terms but Gross is £0 in the export — fee waived or not posted? Check the folio'};
+  return v;
+}
+function cxlVerdictCore(r){
+  const before=(r.arr&&r.cancel)?dayDiff(r.arr,r.cancel):null;
+  const pol=resolvePolicy(r);
+  const ov=CHANNEL_CXL_OVERRIDE.find(o=>o.rx.test(r.chAll));
+  let hours,policy,note='';
+  if(ov){hours=ov.hours;policy=ov.label;}
+  else if(pol.err)return {kind:'check',reason:pol.err,policy:pol.label||'—',before};
+  else{hours=pol.hours;policy=pol.label;}
+  if(hours<0)return {kind:'charge',nrf:true,policy,note,before,due:r.rev};
+  if(!r.arr)return {kind:'check',reason:'No arrival date in the file',policy,note,before};
+  const [hh,mm]=CHECKIN_TIME.split(':').map(Number);
+  const freeUntil=new Date(dOnly(r.arr)+(hh*60+mm)*60000-hours*3600000);
+  if(!r.cancel)return {kind:'check',reason:'No cancellation date in the file',policy,note,before,freeUntil};
+  let kind;
+  if(hasTime(r.cancel)){
+    const diff=(freeUntil-r.cancel)/60000;
+    kind=diff>=DEADLINE_TOLERANCE_MIN?'within':diff<=-DEADLINE_TOLERANCE_MIN?'charge':'edge';
+  }else{
+    const cd=dOnly(r.cancel),fd0=dOnly(freeUntil);
+    kind=cd<fd0?'within':cd>fd0?'charge':'edge';
+  }
+  if(kind==='edge')return {kind:'check',reason:`Cancelled at the deadline (${fdt(freeUntil)}) — confirm the exact time in Apaleo`,policy,note,before,freeUntil};
+  return {kind,policy,note,before,freeUntil,due:r.rev};
+}
+
+/* ---------------- rate-plan check on pickup ---------------- */
+function planCheck(r){
+  if(isExt(r.comment)||isComp(r.seg)||LOS_EXEMPT_CHANNEL_RX.test(r.chAll))return {kind:'ok'};
+  const codes=r._plan.codes;
+  if(!r.ap||!codes.length)return {kind:'unknown',text:`“${r.plan||'no plan'}” not found in Apaleo for ${r.prop}`};
+  if(codes.every(c=>LOS_EXEMPT_PLAN_RX.test(c)))return {kind:'ok'};
+  const rs=codes.map(c=>losRange(c,r.ap)).filter(Boolean);
+  if(!rs.length)return {kind:'legacy',text:`${codes.join('/')} is a legacy plan, not new distribution`};
+  if(!r.los)return {kind:'ok'};
+  const mn=Math.min(...rs.map(x=>x[0])),mx=Math.max(...rs.map(x=>x[1])),lbl=codes.length===1?codes[0]:r.plan;
+  if(r.los<mn)return {kind:'short',text:`${r.los}N on ${lbl} (valid ${bracketTxt([mn,mx])}) — cheaper plan than this stay length allows`};
+  if(r.los>mx)return {kind:'long',text:`${r.los}N on ${lbl} (valid ${bracketTxt([mn,mx])}) — higher rate and shorter free-cancel window than intended`};
+  return {kind:'ok'};
+}
+
+/* ---------------- rows → records ---------------- */
+function buildRecs(rows,hm){
+  const get=(row,k)=>hm[k]!==undefined?row[hm[k]]:'';
+  const seen=new Set(),out=[];
+  rows.forEach(row=>{
+    const id=String(get(row,'id')??'').trim();
+    const r={id:id||'—'};
+    r.propRaw=String(get(row,'prop')||'').trim();
+    r.prop=normProp(r.propRaw);
+    r.created=toDateObj(get(row,'created'));
+    r.cancel=toDateObj(get(row,'cancelTime'))||toDateObj(get(row,'cancel'));
+    r.arr=toDateObj(get(row,'arr'));
+    r.dep=toDateObj(get(row,'dep'));
+    if(!id&&!r.prop&&!r.arr&&!r.created)return;                 // blank / footer row
+    if(id){if(seen.has(id))return;seen.add(id);}
+    r.status=String(get(row,'status')||'');
+    r.plan=String(get(row,'plan')||'').trim();
+    r.unit=String(get(row,'unit')||'').trim();
+    r.cxlpolRaw=String(get(row,'cxlpol')||'').trim();
+    r.raw=num(get(row,'gross'));
+    r.seg=String(get(row,'seg')||'');
+    r.comment=String(get(row,'comment')||'');
+    r.balance=hm.balance!==undefined?num(get(row,'balance')):null;
+    const gn=(String(get(row,'first')||'')+' '+String(get(row,'last')||'')).trim();
+    r.guest=gn||String(get(row,'guest')||'').trim()||'—';
+    const src=String(get(row,'source')||'').trim(),ch=String(get(row,'channel')||'').trim(),sc=String(get(row,'subch')||'').trim();
+    r.channel=src||sc||(/^ibe$/i.test(ch)?'Direct (IBE)':ch)||'Unknown';
+    r.chAll=[src,ch,sc].join(' ');
+    r.los=0;
+    if(r.arr&&r.dep){const n=dayDiff(r.dep,r.arr);if(n>0)r.los=n;}
+    if(!r.los)r.los=parseInt(get(row,'nights'),10)||0;
+    r.isNet=NET_CHANNEL_RX.test(r.chAll);
+    r.rev=r.isNet?r.raw/NET_FACTOR:r.raw;                       // gross-equivalent
+    r.adr=r.los>0?r.rev/r.los:0;
+    r.lead=(r.created&&r.arr)?dayDiff(r.arr,r.created):null;
+    r.isCxl=/cancel/i.test(r.status)||!!r.cancel;
+    r.ap=apaleoProp(r.propRaw,r.prop);
+    r._plan=planCodes(r.ap,r.plan);
+    r._ug=ugCodes(r.ap,r.unit);
+    const b={bud:0,revB:0,nB:0};
+    nightsOf(r).forEach(nt=>{const v=budgetADR(r.prop,nt.d);if(v!=null){b.bud+=v;b.revB+=nt.rev;b.nB++;}});
+    r._b=b;
+    r._v=cxlVerdict(r);
+    r._pc=planCheck(r);
+    out.push(r);
+  });
+  return out;
+}
+
+/* ---------------- state ---------------- */
+let F={created:null,cancelled:null};
+let S={prop:'ALL',tab:'sum',split:'month',from:null,to:null,open:{},fileMode:false};
+/* fileMode = “File dates”: use exactly the rows Apaleo exported (its filter runs in your browser's time zone,
+   the export shows London time — so a few rows sit just outside the dates on the file). */
+const metaDay=s0=>s0?Date.UTC(+s0.slice(0,4),+s0.slice(5,7)-1,+s0.slice(8,10)):null;
+function inMeta(f,d){if(!f||!f.meta||!d)return false;const x=dOnly(d),a=metaDay(f.meta.from),b=metaDay(f.meta.to);return (a==null||x>=a)&&(b==null||x<=b);}
+
+function inWin(d){if(!d)return false;const x=dOnly(d);if(S.from!==null&&x<S.from)return false;if(S.to!==null&&x>S.to)return false;return true;}
+const cxSrc=()=>F.cancelled||F.created;
+function pickAll(){
+  if(!F.created)return [];
+  const fm=S.fileMode&&F.created.meta;
+  const out=F.created.recs.filter(r=>fm?true:inWin(r.created));
+  // the creation export excludes cancelled bookings → add bookings created in the window that are already cancelled
+  if(F.cancelled){const ids=new Set(F.created.recs.map(r=>r.id));F.cancelled.recs.forEach(r=>{if(r.id!=='—'&&!ids.has(r.id)&&(fm?inMeta(F.created,r.created):inWin(r.created)))out.push(r);});}
+  return out;
+}
+const cxlAll=()=>{const s=cxSrc();if(!s)return [];const fm=S.fileMode&&s.meta;return s.recs.filter(r=>r.isCxl&&(fm?true:inWin(r.cancel)));};
+function cxlIds(){const s=cxSrc(),set=new Set();if(s)s.recs.forEach(r=>{if(r.isCxl&&r.id!=='—')set.add(r.id);});return set;}
+const byProp=rs=>S.prop==='ALL'?rs:rs.filter(r=>r.prop===S.prop);
+function sums(rs){
+  let n=0,rev=0,lead=0,ln=0,bud=0,revB=0,nB=0;
+  rs.forEach(r=>{n+=r.los;rev+=r.rev;bud+=r._b.bud;revB+=r._b.revB;nB+=r._b.nB;if(r.lead!=null){lead+=Math.max(0,r.lead);ln++;}});
+  return {bk:rs.length,n,rev,adr:n?rev/n:0,lead:ln?lead/ln:null,los:rs.length?n/rs.length:0,bud,revB,nB};
+}
+
+/* ---------------- aggregation (pickup + cancellations side by side) ---------------- */
+function blank(k,l){return {key:k,label:l,bk:0,n:0,rev:0,bud:0,revB:0,nB:0,cxBk:0,cxN:0,cxRev:0,units:null};}
+const mKey=d=>[d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0'),MON[d.getUTCMonth()]+' '+d.getUTCFullYear()];
+function keyOf(r,mode){
+  if(mode==='channel')return [r.channel,r.channel];
+  if(mode==='unit')return [r.unit||'—',r.unit||'—'];
+  if(mode==='prop')return [r.prop||'—',r.prop||'—'];
+  if(r.lead==null)return ['z','No created date'];
+  const L=Math.max(0,r.lead),i=LEAD_B.findIndex(b=>L>=b[0]&&L<=b[1]);
+  return [String(i),LEAD_B[i][2]];
+}
+function aggregate(P,C,mode){
+  const m={};
+  const get=([k,l])=>m[k]||(m[k]=blank(k,l));
+  const uget=(e,u)=>{u=u||'—';e.units=e.units||{};return e.units[u]||(e.units[u]=blank(u,u));};
+  const addN=(e,r,nt)=>{e.n++;e.rev+=nt.rev;const b=budgetADR(r.prop,nt.d);if(b!=null){e.bud+=b;e.revB+=nt.rev;e.nB++;}};
+  P.forEach(r=>{
+    if(mode==='month'){
+      const ns=nightsOf(r);
+      if(!ns.length){const e=get(['zz','No stay dates']);e.bk++;e.rev+=r.rev;return;}
+      const e0=get(mKey(r.arr));e0.bk++;uget(e0,r.unit).bk++;
+      ns.forEach(nt=>{const e=get(mKey(nt.d));addN(e,r,nt);addN(uget(e,r.unit),r,nt);});
+    }else{
+      const e=get(keyOf(r,mode));e.bk++;e.n+=r.los;e.rev+=r.rev;e.bud+=r._b.bud;e.revB+=r._b.revB;e.nB+=r._b.nB;
+    }
+  });
+  C.forEach(r=>{
+    if(mode==='month'){
+      const ns=nightsOf(r);
+      if(!ns.length){const e=get(['zz','No stay dates']);e.cxBk++;e.cxRev+=r.rev;return;}
+      const e0=get(mKey(r.arr));e0.cxBk++;uget(e0,r.unit).cxBk++;
+      ns.forEach(nt=>{const e=get(mKey(nt.d));e.cxN++;e.cxRev+=nt.rev;const u=uget(e,r.unit);u.cxN++;u.cxRev+=nt.rev;});
+    }else{const e=get(keyOf(r,mode));e.cxBk++;e.cxN+=r.los;e.cxRev+=r.rev;}
+  });
+  const list=Object.values(m);
+  if(mode==='month'||mode==='lead')list.sort((a,b)=>a.key<b.key?-1:a.key>b.key?1:0);
+  else list.sort((a,b)=>(b.rev-a.rev)||(b.cxRev-a.cxRev));
+  return list;
+}
+function totalOf(list){const t=blank('t','Total');list.forEach(x=>['bk','n','rev','bud','revB','nB','cxBk','cxN','cxRev'].forEach(k=>t[k]+=x[k]));return t;}
+
+/* ---------------- small renderers ---------------- */
+function vsPill(revB,bud){
+  if(!(bud>0))return '<span class="muted">—</span>';
+  const p=Math.round((revB/bud-1)*100),c=Math.abs(p)<=2?'p-flat':p>0?'p-up':'p-down';
+  return `<span class="pill ${c}">${p>0?'+':''}${p}%</span>`;
+}
+const kpi=(l,v,s,cls,vcls)=>`<div class="kpi ${cls||''}"><div class="kpi-l">${l}</div><div class="kpi-v ${vcls||''}">${v}</div>${s?`<div class="kpi-s">${s}</div>`:''}</div>`;
+function legacySummary(rs){const c={};rs.forEach(r=>{const k=r._plan.codes.join('/')+' ('+r.prop+')';c[k]=(c[k]||0)+1;});return Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([k,n])=>esc(k)+' ×'+n).join(', ');}
+const sec=(t,cls,right)=>`<div class="sec"><h3 class="${cls||''}">${t}</h3>${right||''}</div>`;
+const emptyBox=t=>`<div class="tw"><div class="empty">${t}</div></div>`;
+function barCell(v,max,tot){
+  return `<td><div class="bar"><div class="bar-t"><div class="bar-f" style="width:${v>0?Math.max(2,Math.round(v/max*100)):0}%"></div></div><span class="bar-v">${gbp(v)}</span><span class="bar-p">${tot>0?Math.round(v/tot*100)+'%':''}</span></div></td>`;
+}
+function rowCells(x,max,tot,plain){
+  const adr=x.n?x.rev/x.n:0,net=x.rev-x.cxRev;
+  const revCell=plain?`<td class="num">${gbp(x.rev)}</td>`:barCell(x.rev,max,tot);
+  const cx=x.cxBk||x.cxRev?`<span style="color:var(--red)">${x.cxRev>=0.5?'−'+gbp(x.cxRev):'£0'}</span><span class="sub">${plural(x.cxBk,'bkg')}</span>`:'<span class="muted">—</span>';
+  return `<td class="num">${x.bk||'<span class="muted">0</span>'}</td><td class="num">${x.n}</td>${revCell}<td class="num">${x.n?gbp(adr):'—'}</td><td>${vsPill(x.revB,x.bud)}</td><td class="num">${cx}</td><td class="num b" style="color:${net<-0.5?'var(--red)':'var(--ink)'}">${money(net)}</td>`;
+}
+const HEAD=first=>`<tr><th>${first}</th><th class="num">New</th><th class="num">Nights</th><th>Pickup revenue</th><th class="num">ADR</th><th>vs Budget</th><th class="num">Cancelled</th><th class="num">Net</th>`;
+function bookingCell(r){return `<b>${esc(r.guest)}</b><span class="sub mono">${esc(r.id)}</span>`;}
+function revCell(r){return `<b>${gbp(r.rev)}</b>${r.isNet?`<span class="sub">net ${gbp(r.raw)} in Apaleo</span>`:''}`;}
+function planCell(r){return `<span class="trunc" title="${esc(r.plan)}">${esc(r.plan)||'—'}</span><span class="sub">${esc(r.unit||'—')}</span>`;}
+const byArr=(a,b)=>(a.arr?dOnly(a.arr):0)-(b.arr?dOnly(b.arr):0);
+function groupByProp(rs){const by={};rs.forEach(r=>(by[r.prop||'—']=by[r.prop||'—']||[]).push(r));return Object.keys(by).sort().map(p=>[p,by[p].sort(byArr)]);}
+
+/* ---------------- RENDER ---------------- */
+function render(){
+  const f=S.from!==null?fdy(new Date(S.from)):null,t=S.to!==null?fdy(new Date(S.to)):null;
+  $('win-note').textContent=(!f&&!t?'All dates':(f===t?f:(f||'start')+' → '+(t||'end')))+(S.fileMode?' · as exported':'');
+  renderChips();renderTabs();
+  if(S.tab==='pick')renderPickup();else if(S.tab==='cxl')renderCxl();else renderSummary();
+}
+function renderChips(){
+  const props=new Set();[F.created,F.cancelled].forEach(f=>f&&f.recs.forEach(r=>{if(r.prop)props.add(r.prop);}));
+  const cnt={};pickAll().forEach(r=>cnt[r.prop]=(cnt[r.prop]||0)+1);
+  $('chips').innerHTML=['ALL',...[...props].sort()].map(p=>`<button class="chip${S.prop===p?' active':''}" data-act="prop" data-prop="${esc(p)}">${p==='ALL'?'All properties':esc(p)}${p!=='ALL'&&cnt[p]?`<span class="n">${cnt[p]}</span>`:''}</button>`).join('');
+}
+function renderTabs(){
+  const P=byProp(pickAll()),C=byProp(cxlAll());
+  const due=C.some(r=>r._v.kind==='charge'),fix=P.some(r=>['short','long','unknown'].includes(r._pc.kind));
+  const t=(id,l,c,alert)=>`<button class="tab${S.tab===id?' active':''}${alert?' alert':''}" data-act="tab" data-tab="${id}">${l}${c!=null?`<span class="count">${c}</span>`:''}</button>`;
+  $('tabs').innerHTML=t('sum','Summary')+t('pick','Pickup',P.length,fix)+t('cxl','Cancellations',C.length,due);
+}
+
+/* ---- SUMMARY ---- */
+function renderSummary(){
+  const P=byProp(pickAll()),C=byProp(cxlAll());
+  const ps=sums(P),cs=sums(C);
+  const charge=C.filter(r=>r._v.kind==='charge'),chk=C.filter(r=>r._v.kind==='check');
+  const due=charge.reduce((s,r)=>s+r._v.due,0);
+  const short=P.filter(r=>r._pc.kind==='short'),long=P.filter(r=>r._pc.kind==='long'),unk=P.filter(r=>r._pc.kind==='unknown'),legacy=P.filter(r=>r._pc.kind==='legacy');
+  const cIds=new Set(C.map(r=>r.id).filter(i=>i!=='—'));
+  const wash=P.filter(r=>cIds.has(r.id));
+  const net=ps.rev-cs.rev;
+
+  const todo=[];
+  if(charge.length)todo.push(['🔴',`<b>${plural(charge.length,'cancellation')}</b> outside terms — <b>${gbp(due)}</b> to charge`,'cxl']);
+  if(short.length)todo.push(['🟠',`<b>${plural(short.length,'booking')}</b> on a cheaper plan than the stay length allows (rate leakage)`,'pick']);
+  if(long.length)todo.push(['🟠',`<b>${plural(long.length,'booking')}</b> on a plan for shorter stays — check rate and cancellation policy`,'pick']);
+  if(legacy.length)todo.push(['🟠',`<b>${plural(legacy.length,'booking')}</b> on ${legacy.length===1?'a legacy plan':'legacy plans'} still selling — ${legacySummary(legacy)}`,'pick']);
+  if(unk.length)todo.push(['🟠',`<b>${plural(unk.length,'booking')}</b> on a rate plan not found in Apaleo`,'pick']);
+  if(chk.length)todo.push(['🟠',`<b>${plural(chk.length,'cancellation')}</b> ${chk.length===1?'needs':'need'} a manual policy check`,'cxl']);
+  if(wash.length)todo.push(['🟢',`${plural(wash.length,'booking')} created and cancelled inside this window (${gbp(wash.reduce((s,r)=>s+r.rev,0))})`,null]);
+  let h=`<div class="todo">${todo.length?todo.map(([d,t,tab])=>`<div class="todo-item"><span>${d}</span><span>${t}</span>${tab?`<button class="go" data-act="tab" data-tab="${tab}">Open →</button>`:''}</div>`).join(''):'<div class="todo-item"><span class="todo-ok">✓ Nothing to action in this window</span></div>'}</div>`;
+
+  h+=`<div class="kpis">
+    ${kpi('New bookings',ps.bk,`${ps.n} nights · LOS ${ps.los.toFixed(1)} · lead ${ps.lead==null?'—':Math.round(ps.lead)+'d'}`,'navy')}
+    ${kpi('Pickup revenue',gbp(ps.rev),`ADR ${gbp(ps.adr)} ${vsPill(ps.revB,ps.bud)}`)}
+    ${kpi('Cancelled',cs.rev>0.5?'−'+gbp(cs.rev):'£0',`${plural(cs.bk,'booking')} · ${cs.n} nights`)}
+    ${kpi('Net pickup',money(net),`${ps.n-cs.n} net nights`,net<-0.5?'red':'green',net<-0.5?'red':'green')}
+    ${kpi('To recover',gbp(due),`${charge.length} outside terms`,due>0?'red':'',due>0?'red':'')}
+  </div>`;
+
+  if(S.prop==='ALL'){
+    const list=aggregate(P,C,'prop');
+    if(list.length){
+      const max=Math.max(...list.map(x=>x.rev),1),tot=list.reduce((s,x)=>s+x.rev,0);
+      h+=sec('By property','','<span class="note">Click a row to open that property</span>');
+      h+=`<div class="tw"><table><thead>${HEAD('Property')}<th>Flags</th></tr></thead><tbody>`;
+      list.forEach(x=>{
+        const d=C.filter(r=>r.prop===x.key&&r._v.kind==='charge').reduce((s,r)=>s+r._v.due,0);
+        const pi=P.filter(r=>r.prop===x.key&&r._pc.kind!=='ok').length;  // incl. legacy
+        const flags=(d?`<span class="pill p-red">${gbp(d)} due</span> `:'')+(pi?`<span class="pill p-orange">${pi} plan</span>`:'');
+        h+=`<tr class="click" data-act="prop" data-prop="${esc(x.key)}"><td class="b">${esc(x.label)}</td>${rowCells(x,max,tot)}<td>${flags||'<span class="muted">—</span>'}</td></tr>`;
+      });
+      h+=`<tr class="total"><td>Total</td>${rowCells(totalOf(list),1,0,true)}<td></td></tr></tbody></table></div>`;
+    }
+  }
+
+  const names={month:'stay month',channel:'channel',unit:'unit type',lead:'lead time'};
+  const seg=`<div class="seg">${[['month','Stay month'],['channel','Channel'],['unit','Unit type'],['lead','Lead time']].map(([k,l])=>`<button class="${S.split===k?'active':''}" data-act="split" data-split="${k}">${l}</button>`).join('')}</div>`;
+  h+=sec(`${S.prop==='ALL'?'Portfolio':esc(S.prop)} by ${names[S.split]}`,'',seg);
+  const list=aggregate(P,C,S.split);
+  if(!list.length)h+=emptyBox('Nothing in this window — widen the dates or hit “File dates”.');
+  else{
+    const max=Math.max(...list.map(x=>x.rev),1),tot=list.reduce((s,x)=>s+x.rev,0);
+    const first={month:'Stay month',channel:'Channel',unit:'Unit type',lead:'Lead time'}[S.split];
+    h+=`<div class="tw"><table><thead>${HEAD(first)}</tr></thead><tbody>`;
+    list.forEach(x=>{
+      const exp=S.split==='month'&&x.units,open=exp&&S.open[x.key];
+      h+=`<tr${exp?` class="click" data-act="month" data-key="${esc(x.key)}"`:''}><td>${exp?`<span class="caret${open?' open':''}"></span>`:''}<b>${esc(x.label)}</b></td>${rowCells(x,max,tot)}</tr>`;
+      if(open)h+=`<tr><td class="ud-cell" colspan="8">${unitTable(x)}</td></tr>`;
+    });
+    h+=`<tr class="total"><td>Total</td>${rowCells(totalOf(list),1,0,true)}</tr></tbody></table></div>`;
+  }
+  h+=`<div class="note">${S.split==='month'?'Revenue is spread over the nights of each stay; bookings count in their arrival month. Click a month to see unit types. ':''}Cancelled = bookings cancelled in the window. Net = pickup − cancelled.</div>`;
+  $('view').innerHTML=h;
+}
+function unitTable(x){
+  const us=Object.values(x.units).sort((a,b)=>(b.rev-a.rev)||(b.cxRev-a.cxRev));
+  const max=Math.max(...us.map(u=>u.rev),1),tot=us.reduce((s,u)=>s+u.rev,0);
+  return `<div class="ud"><table><thead>${HEAD('Unit type · '+esc(x.label))}</tr></thead><tbody>${us.map(u=>`<tr><td class="b">${esc(u.label)}</td>${rowCells(u,max,tot)}</tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ---- PICKUP ---- */
+function renderPickup(){
+  if(!F.created){$('view').innerHTML=`<div style="margin-top:16px">${emptyBox('No creation file loaded — use “Change files” to add one.')}</div>`;return;}
+  const P=byProp(pickAll()),ps=sums(P),cI=cxlIds();
+  let h=`<div class="kpis">
+    ${kpi('New bookings',ps.bk,`${ps.n} nights`,'navy')}
+    ${kpi('Pickup revenue',gbp(ps.rev),`ADR ${gbp(ps.adr)} ${vsPill(ps.revB,ps.bud)}`)}
+    ${kpi('Avg lead time',ps.lead==null?'—':Math.round(ps.lead)+' days','booking → arrival')}
+    ${kpi('Avg length of stay',ps.los.toFixed(1)+' nights','')}
+  </div>`;
+  const leg=P.filter(r=>r._pc.kind==='legacy');
+  if(leg.length)h+=`<div class="warn-bar">Legacy plans still selling (${leg.length}): ${legacySummary(leg)} — close or remap in Apaleo / channel manager.</div>`;
+  const fix=P.filter(r=>['short','long','unknown'].includes(r._pc.kind)).sort((a,b)=>(a._pc.kind==='short'?0:1)-(b._pc.kind==='short'?0:1));
+  if(fix.length){
+    h+=sec(`To fix in Apaleo (${fix.length})`,'orange');
+    h+=`<div class="tw"><table><thead><tr><th>Booking</th><th>Property</th><th>Channel</th><th>Rate plan · unit</th><th>Stay</th><th>Issue</th><th class="num">Revenue</th></tr></thead><tbody>`;
+    fix.forEach(r=>{h+=`<tr class="${r._pc.kind==='short'?'r-red':'r-orange'}"><td>${bookingCell(r)}</td><td class="b">${esc(r.prop)}</td><td>${esc(r.channel)}</td><td>${planCell(r)}</td><td>${fd(r.arr)} → ${fd(r.dep)}<span class="sub">${r.los}N</span></td><td class="wrap">${esc(r._pc.text)}</td><td class="num">${revCell(r)}</td></tr>`;});
+    h+=`</tbody></table></div>`;
+  }
+  h+=sec(`Bookings picked up (${P.length})`);
+  if(!P.length){h+=emptyBox('No bookings created in this window — check the file line above, then widen the dates or hit “File dates”.');$('view').innerHTML=h;return;}
+  h+=`<div class="tw"><table><thead><tr><th>Booking</th><th>Channel</th><th>Rate plan · unit</th><th>Stay</th><th class="num">Lead</th><th class="num">ADR</th><th>vs Budget</th><th class="num">Revenue</th><th>Check</th></tr></thead><tbody>`;
+  groupByProp(P).forEach(([p,rs])=>{
+    const s=sums(rs);
+    h+=`<tr class="grp"><td colspan="9"><b>${esc(p)}</b><span class="gs">${plural(s.bk,'booking')} · ${plural(s.n,'night')} · ${gbp(s.rev)} · ADR ${gbp(s.adr)}</span></td></tr>`;
+    rs.forEach(r=>{
+      const pc=r._pc;
+      const PILL={short:['p-red','Rate leakage'],long:['p-orange','LOS above plan'],legacy:['p-amber','Legacy plan'],unknown:['p-orange','Plan not in Apaleo']}[pc.kind];
+      let chk=PILL?`<span class="pill ${PILL[0]}" title="${esc(pc.text)}">${PILL[1]}</span>`:'<span class="ok">✓</span>';
+      if(r.isCxl||cI.has(r.id))chk+=' <span class="pill p-grey">Cancelled since</span>';
+      h+=`<tr><td>${bookingCell(r)}</td><td>${esc(r.channel)}</td><td>${planCell(r)}</td><td>${fd(r.arr)} → ${fd(r.dep)}<span class="sub">${r.los}N</span></td><td class="num">${r.lead==null?'—':Math.max(0,r.lead)+'d'}</td><td class="num">${r.los?gbp(r.adr):'—'}</td><td>${vsPill(r._b.revB,r._b.bud)}</td><td class="num">${revCell(r)}</td><td>${chk}</td></tr>`;
+    });
+  });
+  h+=`</tbody></table></div><div class="note">Expedia &amp; HyperGuest revenue shown gross-equivalent (net ÷ ${NET_FACTOR}); the amount Apaleo holds is underneath.</div>`;
+  $('view').innerHTML=h;
+}
+
+/* ---- CANCELLATIONS ---- */
+function renderCxl(){
+  const C=byProp(cxlAll()),cs=sums(C);
+  const ch=C.filter(r=>r._v.kind==='charge'),ck=C.filter(r=>r._v.kind==='check'),wi=C.filter(r=>r._v.kind==='within'),ho=C.filter(r=>r._v.kind==='hotel');
+  const due=ch.reduce((s,r)=>s+r._v.due,0);
+  let h=`<div class="kpis">
+    ${kpi('Cancellations',cs.bk,`${cs.n} nights lost`,'navy')}
+    ${kpi('Revenue cancelled',cs.rev>0.5?'−'+gbp(cs.rev):'£0',`ADR ${gbp(cs.adr)}`)}
+    ${kpi('Outside terms',ch.length,`${wi.length} within terms${ho.length?' · '+ho.length+' hotel-initiated':''}`,ch.length?'red':'green',ch.length?'red':'green')}
+    ${kpi('To recover',gbp(due),'100% of stay value',due>0?'red':'',due>0?'red':'')}
+    ${ck.length?kpi('Manual check',ck.length,'policy unclear'):''}
+  </div>`;
+  if(!C.length){h+=emptyBox('No cancellations in this window. They often land on the export day — try “Today” or “File dates”.');$('view').innerHTML=h;return;}
+  if(ch.length){h+=sec(`🔴 Charge due — outside terms (${ch.length}) · ${gbp(due)}`,'red','<span class="note">Confirm each fee is posted in Apaleo</span>');h+=cxTable(ch,'charge');}
+  else h+=`<div class="todo"><div class="todo-item"><span class="todo-ok">✓ Nothing to recover — no cancellation outside terms</span></div></div>`;
+  if(ck.length){h+=sec(`🟠 Check manually (${ck.length})`,'amber');h+=cxTable(ck,'check');}
+  const wiNote=wi.concat(ho).filter(r=>r._v.note&&/open/.test(r._v.note));
+  if(wiNote.length)h+=`<div class="warn-bar">${plural(wiNote.length,'cancellation')} with nothing to charge still ${wiNote.length===1?'shows':'show'} an open fee in Apaleo — ${wiNote.map(r=>esc(r.id)+' '+gbp(-r.balance)).join(', ')}. Clear or refund in the folio.</div>`;
+  if(wi.length)h+=`<details class="fold"><summary>Within terms (${wi.length}) · ${gbp(wi.reduce((s,r)=>s+r.rev,0))} cancelled, nothing due</summary>${cxTable(wi,'within')}</details>`;
+  if(ho.length)h+=`<details class="fold"><summary>Hotel-initiated (${ho.length}) · overbooking / relocation, not charged</summary>${cxTable(ho,'within')}</details>`;
+  $('view').innerHTML=h;
+}
+function cxTable(rs,kind){
+  rs=rs.slice().sort((a,b)=>(a.prop<b.prop?-1:a.prop>b.prop?1:0)||byArr(a,b));
+  let h=`<div class="tw"><table><thead><tr><th>Booking</th><th>Property</th><th>Channel</th><th>Rate plan · unit</th><th>Arrival</th><th>Cancelled</th><th>Free until</th><th>Policy</th><th class="${kind==='check'?'':'num'}">${kind==='check'?'Why':kind==='charge'?'Amount due':'Value'}</th></tr></thead><tbody>`;
+  rs.forEach(r=>{
+    const v=r._v;
+    const before=v.before!=null?`<span class="sub">${v.before<0?Math.abs(v.before)+'d after arrival':v.before+'d before arrival'}</span>`:'';
+    const free=v.nrf?'<span style="color:var(--red)">Non-refundable</span>':(v.freeUntil?fd(v.freeUntil)+' '+hhmm(v.freeUntil):'—');
+    const last=kind==='check'?`<td class="wrap">${esc(v.reason)}<span class="sub">${gbp(r.rev)}${r.isNet?' · net '+gbp(r.raw)+' in Apaleo':''}</span></td>`:`<td class="num">${revCell(r)}</td>`;
+    h+=`<tr class="${kind==='charge'?'r-red':''}"><td>${bookingCell(r)}</td><td class="b">${esc(r.prop)}</td><td>${esc(r.channel)}</td><td>${planCell(r)}</td><td>${fd(r.arr)}</td><td>${fdt(r.cancel)}${before}</td><td>${free}</td><td class="pol">${esc(v.policy||'—')}${v.note?`<span class="sub">${esc(v.note)}</span>`:''}</td>${last}</tr>`;
+  });
+  return h+'</tbody></table></div>';
+}
+
+/* ---------------- rules box (Apaleo confirmation table) ---------------- */
+const FAMS=[['DIRECT',[1,2,3,7,14]],['OTA',[1,2,3,7,14]],['PROMOOTA',[1,2,3,7]],['SEMIFLEX',[3,7,14]],['OTASEMI',[1,2,3,7,14]],['NRF',[1,2,3,7,14]]];
+function cellFor(ap,fam,n){
+  const plans=APALEO.PLAN[ap],nb=new Set(APALEO.NB[ap]||[]);
+  const code=[fam+'LOS'+n,fam==='OTASEMI'?'OTASEMIFLEXLOS'+n:null].find(c=>c&&plans[c]&&!nb.has(c));
+  if(!code)return '–';
+  const v=plans[code];
+  if(typeof v==='string'){const h=policyHours(ap,v);return h<0?'NRF':hrsTxt(h);}
+  return [...new Set(Object.values(v).map(p=>policyHours(ap,p)))].sort((a,b)=>a-b).map(h=>h<0?'NRF':hrsTxt(h)).join('/');
+}
+function renderRules(){
+  const props=Object.keys(APALEO.PLAN).map(ap=>[normProp(ap),ap]).sort((a,b)=>a[0]<b[0]?-1:1);
+  const head=FAMS.map(([f,ns])=>`<th>${f}<span class="sub">LOS ${ns.join('·')}</span></th>`).join('');
+  const rows=props.map(([nm,ap])=>`<tr><td class="b">${esc(nm)}</td>${FAMS.map(([f,ns])=>{const c=ns.map(n=>cellFor(ap,f,n));const av=ns.filter((n,i)=>c[i]!=='–');return `<td class="mono">${av.length&&av.every((n,i)=>c[ns.indexOf(n)]==='NRF')?(av.length===ns.length?'all NRF':'NRF · LOS '+av.join('·')+' only'):c.join(' · ')}</td>`;}).join('')}</tr>`).join('');
+  const ov=CHANNEL_CXL_OVERRIDE.map(o=>o.label).join(', ');
+  $('rules').innerHTML=`<summary>Rules this tool uses · Apaleo cancellation set-up (snapshot ${APALEO.snapshot})</summary>
+  <ul>
+    <li><b>Cancellation terms = Apaleo.</b> Each booking is matched on property + rate plan + unit type to the policy set in Apaleo. Free if cancelled before <b>${CHECKIN_TIME} on arrival day minus the policy period</b>; after that <b>100% of the stay is due</b>. NRF always due.${ov?` Channel override: <b>${esc(ov)}</b>.`:''} Within ${DEADLINE_TOLERANCE_MIN} min of the deadline → manual check. Overbooking / relocation in the comment → hotel-initiated, never charged. Gross £0 on a late cancellation → manual check (fee waived or not posted).</li>
+    <li>If the export has a <b>Cancellation policy</b> column, that value is used first.</li>
+    <li><b>Revenue</b> = Apaleo “Gross amount”. <b>Expedia &amp; HyperGuest</b> arrive net → gross-equivalent = net ÷ ${NET_FACTOR}; raw net shown underneath.</li>
+    <li><b>Window</b>: “File dates” uses exactly the rows Apaleo exported (Apaleo filters in your browser's time zone; the export shows London time). Any other dates filter on the dates in the file.</li>
+    <li><b>Pickup</b> = bookings created in the window, including any cancelled since (taken from the cancellation file, as the creation export excludes cancelled). <b>Cancelled</b> = cancelled in the window. <b>Net</b> = pickup − cancelled.</li>
+    <li><b>LOS check</b>: LOS1 = 1N · LOS2 = 2N · LOS3 = 3–6N · LOS7 = 7–13N · LOS14 = 14N+. Not checked for Airbnb / Plum Guide / VRBO (all stays map to one plan), Agency &amp; Extended plans, extensions and comps.</li>
+    <li><b>Budget</b>: monthly property budget ADR (${Object.keys(ADR_BUDGET).join(', ')}), compared night by night.</li>
+  </ul>
+  <div class="tw"><table><thead><tr><th>Property</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>
+  <div class="note">Free-cancellation period before check-in, as set in Apaleo on ${APALEO.snapshot}. “–” = no bookable plan. “a/b” = differs by unit type. Ask Claude to refresh this snapshot from Apaleo after any policy change.</div>`;
+}
+
+/* ---------------- file loading ---------------- */
+function fileWarnings(kind,hm,recs){
+  const need=kind==='created'?['created','arr','plan','gross','prop','unit']:['cancel','arr','plan','gross','prop','unit'];
+  const miss=need.filter(k=>hm[k]===undefined).map(k=>LABEL[k]);
+  if(hm.dep===undefined&&hm.nights===undefined)miss.push('Departure');
+  if(hm.source===undefined&&hm.channel===undefined&&hm.subch===undefined)miss.push('Source / Channel');
+  const w=[];
+  if(miss.length)w.push(`missing column${miss.length>1?'s':''} <b>${miss.join(', ')}</b> — related figures will be blank or wrong.`);
+  if(kind==='cancelled'&&recs.length&&!recs.some(r=>r.isCxl))w.push('no cancelled bookings found — is this the cancellation export?');
+  return w;
+}
+function loadFile(kind,file){
+  const zf=$('uzf-'+kind);zf.textContent='Reading '+file.name+'…';
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',raw:true});
+      const ws=wb.Sheets['Data']||wb.Sheets[wb.SheetNames[0]];
+      let meta=null;
+      if(wb.Sheets['Metadata']){meta={};XLSX.utils.sheet_to_json(wb.Sheets['Metadata'],{header:1,defval:'',raw:false}).forEach(r=>{if(r[0])meta[String(r[0]).trim()]=String(r[1]||'').trim();});}
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',blankrows:false,raw:true});
+      let hi=aoa.findIndex(row=>row.some(c=>/^(arrival|created at|rate plan|property code|status)$/i.test(String(c).trim())));
+      if(hi<0)hi=0;
+      const headers=(aoa[hi]||[]).map(h=>String(h).trim());
+      const rows=aoa.slice(hi+1).map(a=>{const o={};headers.forEach((h,i)=>{if(h&&!(h in o))o[h]=a[i];});return o;});
+      const hm=headerMap(headers);
+      const recs=buildRecs(rows,hm);
+      const warns=fileWarnings(kind,hm,recs);
+      if(meta&&meta.dateFilter){const want=kind==='created'?'Creation':'Cancellation';if(meta.dateFilter!==want)warns.unshift(`exported with date filter <b>${esc(meta.dateFilter)}</b> — expected <b>${want}</b>. Wrong drop zone?`);}
+      F[kind]={name:file.name,recs,hm,meta,warns};
+      $('uz-'+kind).classList.add('loaded');
+      zf.innerHTML=`✓ ${esc(file.name)} · ${plural(recs.length,'booking')}`;
+      $('open-btn').disabled=false;
+      showWarns('upload-warns');
+      if(!$('results').classList.contains('hidden'))openTracker();
+    }catch(err){
+      F[kind]=null;$('uz-'+kind).classList.remove('loaded');
+      zf.textContent=(typeof XLSX==='undefined'?'Excel reader didn’t load — check your internet connection and reload. ':'Could not read this file: ')+err.message;
+    }
+  };
+  rd.readAsArrayBuffer(file);
+}
+function showWarns(target){
+  const w=[];['created','cancelled'].forEach(k=>{if(F[k])F[k].warns.forEach(x=>w.push(`<b>${k==='created'?'Creation':'Cancellation'} file</b> — ${x}`));});
+  $(target).innerHTML=w.map(x=>`<div class="warn-bar">${x}</div>`).join('');
+}
+function rangeTxt(ds){const r=minmax(ds);if(!r)return '—';return r[0]===r[1]?fdy(new Date(r[0])):fdy(new Date(r[0]))+' → '+fdy(new Date(r[1]));}
+function fileRange(){
+  const ms=[F.created,F.cancelled].filter(f=>f&&f.meta&&f.meta.from);
+  if(ms.length){const a=Math.min(...ms.map(f=>metaDay(f.meta.from))),b=Math.max(...ms.map(f=>metaDay(f.meta.to||f.meta.from)));return [a,b];}
+  let ds=[];
+  if(F.created)ds=ds.concat(F.created.recs.filter(r=>r.created).map(r=>dOnly(r.created)));
+  if(F.cancelled)ds=ds.concat(F.cancelled.recs.filter(r=>r.isCxl&&r.cancel).map(r=>dOnly(r.cancel)));
+  return minmax(ds);
+}
+function openTracker(){
+  $('upload-area').classList.add('hidden');$('results').classList.remove('hidden');
+  const L=[];
+  const metaTxt=f=>f.meta&&f.meta.from?` · exported ${fdy(new Date(metaDay(f.meta.from)))} → ${fdy(new Date(metaDay(f.meta.to||f.meta.from)))}${f.meta.status?' · '+esc(f.meta.status.replace(/,/g,', ')):''}`:'';
+  if(F.created)L.push(`Creation file <strong>${esc(F.created.name)}</strong> · ${F.created.recs.length} rows${metaTxt(F.created)||' · created '+rangeTxt(F.created.recs.filter(r=>r.created).map(r=>dOnly(r.created)))}`);
+  else L.push('No creation file — pickup is empty');
+  if(F.cancelled)L.push(`Cancellation file <strong>${esc(F.cancelled.name)}</strong> · ${F.cancelled.recs.length} rows${metaTxt(F.cancelled)||' · cancelled '+rangeTxt(F.cancelled.recs.filter(r=>r.isCxl&&r.cancel).map(r=>dOnly(r.cancel)))}`);
+  else L.push('No cancellation file — cancellations read from the creation file');
+  $('files-line').innerHTML=L.join('<br>');
+  showWarns('warns');
+  renderRules();
+  S.prop='ALL';S.open={};
+  preset('file');
+}
+
+/* ---------------- date window ---------------- */
+const ymdLocal=d=>{const z=new Date(d.getTime()-d.getTimezoneOffset()*60000);return z.toISOString().slice(0,10);};
+const ymdUTC=ms=>new Date(ms).toISOString().slice(0,10);
+function preset(kind){
+  const today=new Date();let f='',t='';
+  if(kind==='file'){const r=fileRange();if(r){f=ymdUTC(r[0]);t=ymdUTC(r[1]);}}
+  else if(kind==='t'){f=t=ymdLocal(today);}
+  else if(kind==='y'){const d=new Date(today);d.setDate(d.getDate()-1);f=t=ymdLocal(d);}
+  else if(kind==='7'){const a=new Date(today);a.setDate(a.getDate()-7);const b=new Date(today);b.setDate(b.getDate()-1);f=ymdLocal(a);t=ymdLocal(b);}
+  else if(kind==='mtd'){f=ymdLocal(new Date(today.getFullYear(),today.getMonth(),1));t=ymdLocal(today);}
+  $('from').value=f;$('to').value=t;applyDates(kind==='file'&&[F.created,F.cancelled].some(x=>x&&x.meta));
+}
+function applyDates(fm){
+  S.fileMode=fm===true;
+  const fv=$('from').value,tv=$('to').value;
+  S.from=fv?Date.UTC(+fv.slice(0,4),+fv.slice(5,7)-1,+fv.slice(8,10)):null;
+  S.to=tv?Date.UTC(+tv.slice(0,4),+tv.slice(5,7)-1,+tv.slice(8,10)):null;
+  render();
+}
+
+/* ---------------- CSV export (current tab) ---------------- */
+function csvEsc(v){v=v==null?'':String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function exportCSV(){
+  const P=byProp(pickAll()),C=byProp(cxlAll());let cols,rows;
+  if(S.tab==='pick'){
+    const cI=cxlIds();
+    cols=['Property','Booking ID','Guest','Channel','Rate plan','Unit type','Created','Arrival','Departure','Nights','Lead days','Revenue (gross-eq)','Amount in Apaleo','Net channel','ADR','Budget ADR','Plan check','Cancelled since'];
+    rows=P.map(r=>[r.prop,r.id,r.guest,r.channel,r.plan,r.unit,isoD(r.created),isoD(r.arr),isoD(r.dep),r.los,r.lead==null?'':r.lead,r.rev.toFixed(2),r.raw.toFixed(2),r.isNet?'Y':'',r.adr.toFixed(2),r._b.nB?(r._b.bud/r._b.nB).toFixed(2):'',r._pc.kind==='ok'?'OK':r._pc.text,(r.isCxl||cI.has(r.id))?'Y':'']);
+  }else if(S.tab==='cxl'){
+    cols=['Property','Booking ID','Guest','Channel','Rate plan','Unit type','Arrival','Cancelled','Days before arrival','Policy','Free until','Verdict','Revenue (gross-eq)','Amount in Apaleo','Net channel','Note'];
+    rows=C.map(r=>{const v=r._v;return [r.prop,r.id,r.guest,r.channel,r.plan,r.unit,isoD(r.arr),r.cancel?isoD(r.cancel)+(hasTime(r.cancel)?' '+hhmm(r.cancel):''):'',v.before==null?'':v.before,v.policy||'',v.nrf?'Non-refundable':(v.freeUntil?isoD(v.freeUntil)+' '+hhmm(v.freeUntil):''),({charge:'Charge due',within:'Within terms',hotel:'Hotel-initiated',check:'Check manually'})[v.kind],r.rev.toFixed(2),r.raw.toFixed(2),r.isNet?'Y':'',[v.reason,v.note].filter(Boolean).join(' · ')];});
+  }else{
+    cols=['Property','New bookings','Nights','Pickup revenue','ADR','Budget ADR','ADR vs budget %','Cancelled bookings','Cancelled revenue','Net revenue'];
+    rows=aggregate(P,C,'prop').map(x=>[x.label,x.bk,x.n,x.rev.toFixed(2),x.n?(x.rev/x.n).toFixed(2):'',x.nB?(x.bud/x.nB).toFixed(2):'',x.bud?Math.round((x.revB/x.bud-1)*100):'',x.cxBk,x.cxRev.toFixed(2),(x.rev-x.cxRev).toFixed(2)]);
+  }
+  const lines=[cols.join(','),...rows.map(r=>r.map(csvEsc).join(','))];
+  const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`nestor_${{sum:'summary',pick:'pickup',cxl:'cancellations'}[S.tab]}_${S.prop}_${$('from').value||'all'}_${$('to').value||'all'}.csv`;
+  a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+
+/* ---------------- optional AI briefing ---------------- */
+function getAIKey(){
+  let k='';try{k=localStorage.getItem('nestor_ai_key')||'';}catch(e){}
+  if(!k){k=(prompt('Paste your Anthropic API key (sk-ant-…). It is stored only in this browser and sent only to api.anthropic.com.')||'').trim();if(k){try{localStorage.setItem('nestor_ai_key',k);}catch(e){}}}
+  return k;
+}
+async function runAI(){
+  const box=$('ai-box'),btn=$('btn-ai'),key=getAIKey();
+  box.classList.remove('hidden');
+  if(!key){box.textContent='No API key — the AI briefing needs an Anthropic API key.';return;}
+  btn.disabled=true;box.innerHTML='<span class="spinner"></span>Writing briefing…';
+  const P=byProp(pickAll()),C=byProp(cxlAll()),ps=sums(P),cs=sums(C);
+  const payload={window:$('win-note').textContent,property:S.prop==='ALL'?'All properties':S.prop,
+    note:`Revenue is gross-equivalent (Expedia & HyperGuest net ÷ ${NET_FACTOR}). All rate plans are new distribution.`,
+    pickup:{bookings:ps.bk,nights:ps.n,revenue:Math.round(ps.rev),adr:Math.round(ps.adr),adrVsBudgetPct:ps.bud?Math.round((ps.revB/ps.bud-1)*100):null,avgLeadDays:ps.lead==null?null:Math.round(ps.lead),avgLOS:+ps.los.toFixed(1),
+      byChannel:aggregate(P,[],'channel').map(x=>({channel:x.label,bookings:x.bk,revenue:Math.round(x.rev)})),
+      byStayMonth:aggregate(P,C,'month').map(x=>({month:x.label,pickupRevenue:Math.round(x.rev),cancelledRevenue:Math.round(x.cxRev)}))},
+    cancellations:{count:cs.bk,nights:cs.n,revenue:Math.round(cs.rev),
+      chargeDue:C.filter(r=>r._v.kind==='charge').map(r=>({id:r.id,guest:r.guest,property:r.prop,channel:r.channel,policy:r._v.policy,amount:Math.round(r._v.due)})),
+      manualCheck:C.filter(r=>r._v.kind==='check').length},
+    ratePlanIssues:P.filter(r=>r._pc.kind!=='ok').map(r=>({id:r.id,property:r.prop,plan:r.plan,nights:r.los,issue:r._pc.text}))};
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-5-5',max_tokens:800,
+        system:'You brief the revenue manager of NESTOR (London serviced apartments). Order: 1) cancellations outside terms — each guest, property, amount, then the total to recover; 2) rate-plan issues to fix; 3) a short pickup read — bookings, revenue, ADR vs budget, channel mix, net pickup by stay month. Plain language, bullets, £, under 200 words. Never invent figures.',
+        messages:[{role:'user',content:JSON.stringify(payload)}]})});
+    const d=await resp.json();
+    if(resp.status===401){try{localStorage.removeItem('nestor_ai_key');}catch(e){}box.textContent='API key rejected (401) — it has been cleared. Click again to enter a new key.';}
+    else box.textContent=(d.content||[]).map(c=>c.text||'').join('\n')||('No response.'+(d.error?' ('+d.error.message+')':''));
+  }catch(err){box.textContent='Error: '+err.message;}
+  btn.disabled=false;
+}
+
+/* ---------------- APALEO snapshot (generated from the Apaleo API — do not edit by hand) ---------------- */
+const APALEO={"NAMES":{"6KP":{"1. flexible rate standard double":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2. flexible rate studio lower ground":["FLEXIBLE"],"3. flexible rate studio double":["FLEXIBLE"],"3nights flexible rate ota":["3NFLEXOTA"],"4. flexible rate studio with balcony":["FLEXIBLE"],"5. flexible rate apartment":["FLEXIBLE"],"5nights flexible rate ota":["5NFLEXOTA"],"6. flexible rate deluxe studio king":["FLEXIBLE"],"7nights flexible rate ota":["7NFLEXOTA"],"free cancellation":["14NFLEX","3NFLEX","5NFLEX","7NFLEX"],"free cancellation 1 day in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 14 days in advance":["DIRECTLOS14"],"free cancellation 3 days in advance":["DIRECTLOS3"],"free cancellation 30 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS7"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE"],"non refundable rate ota":["NRFRATEOTA"]},"ANTIGAL":{"1. flexible rate small studio":["FLEXIBLE"],"2. flexible rate studio":["FLEXIBLE"],"free cancellation 1 day in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 14 days in advance":["DIRECTLOS14"],"free cancellation 3 days in advance":["3NFLEX"],"free cancellation 30 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS7"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7"],"ota los1":["OTALOS1"],"ota los14":["OTALOS14"],"ota los2":["OTALOS2"],"ota los3":["3NFLEXOTA"],"ota los7":["OTALOS7"],"ota semiflex los1":["OTASEMIFLEXLOS1"],"ota semiflex los14":["OTASEMIFLEXLOS14"],"ota semiflex los2":["OTASEMIFLEXLOS2"],"ota semiflex los3":["OTASEMIFLEXLOS3"],"ota semiflex los7":["OTASEMIFLEXLOS7"]},"BAKERY":{"1. flexible rate studio apartment lg":["FLEXIBLE"],"2. flexible rate studio apartment":["FLEXIBLE"],"2nights flexible rate ota":["2NFLEXOTA"],"3. flexible rate 2 bedroom apartment":["FLEXIBLE"],"3nights flexible rate ota":["3NFLEXOTA"],"5nights flexible rate ota":["5NFLEXOTA"],"7nights flexible rate ota":["7NFLEXOTA"],"flexible rate ota":["FLEXIBLEOTA"],"free cancellation":["2NFLEX","2NFLEXLOYALTY","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXPROMO","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","MIDTERM","MIDTERMLOYALTY","MIDTERMPROMO"],"free cancellation 1 day in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 14 days in advance":["DIRECTLOS14"],"free cancellation 3 days in advance":["DIRECTLOS3"],"free cancellation 30 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS7"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE","NRFRATELOYALTY","NRFRATEPROMO"],"non refundable rate ota":["NRFRATEOTA"]},"BOURNE":{"free cancellation 14 days in advance":["DIRECTLOS7"],"free cancellation 3 days in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 30 days in advance":["DIRECTLOS14"],"free cancellation 45 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS3"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7"]},"BRONDBRY":{"1. flexible rate superior studio":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2nights flexible rate ota":["2NFLEXOTA"],"3nights flexible rate ota":["3NFLEXOTA"],"5nights flexible rate ota":["5NFLEXOTA"],"7nights flexible rate ota":["7NFLEXOTA"],"flexible rate ota":["FLEXIBLEOTA"],"free cancellation":["14NFLEXLOYALTY","2NFLEX","3NFLEX","3NFLEXLOYALTY","5NFLEX","7NFLEX","7NFLEXLOYALTY","FLEXDIRECT","MIDTERM"],"free cancellation 1 day in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 14 days in advance":["DIRECTLOS14"],"free cancellation 3 days in advance":["DIRECTLOS3"],"free cancellation 30 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS7"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE"],"non refundable rate ota":["NRFRATEOTA"]},"CARLYSLE":{"1. flexible rate 2 bedroom apartment":["FLEXIBLE"],"2. flexible rate 3 bedroom apartment":["FLEXIBLE"],"3. flexible rate 4 bedroom apartment, sleeps 7":["FLEXIBLE"],"3nights flexible rate ota":["3NFLEXOTA"],"4. flexible rate 4 bedroom apartment, sleeps 8":["FLEXIBLE"],"5nights flexible rate ota":["5NFLEXOTA"],"7nights flexible rate ota":["7NFLEXOTA"],"free cancellation":["5NFLEX"],"free cancellation 14 days in advance":["DIRECTLOS7"],"free cancellation 3 days in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 30 days in advance":["DIRECTLOS14"],"free cancellation 45 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS3"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7"]},"CHENISTON":{"free cancellation 1 day in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 14 days in advance":["DIRECTLOS14"],"free cancellation 3 days in advance":["DIRECTLOS3"],"free cancellation 30 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS7"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7"]},"CLARIDGE":{"1. flexible rate 1 bd apt":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2. flexible rate 1 bd apt deluxe":["FLEXIBLE"],"2nights flexible rate ota":["2NFLEXOTA"],"2nights promo discount rate":["2NFLEXPROMO"],"3. flexible rate 2 bd apt":["FLEXIBLE"],"3nights flexible rate ota":["3NFLEXOTA"],"4. flexible rate 2 bd apt deluxe":["FLEXIBLE"],"5. flexible rate 3 bd apt":["FLEXIBLE"],"5nights flexible rate ota":["5NFLEXOTA"],"7nights flexible rate ota":["7NFLEXOTA"],"extended 1":["EXTENDEDDIRECT1"],"extended 2":["EXTENDEDDIRECT2"],"extended 3":["EXTENDEDDIRECT3"],"extended ota 1":["EXTENDEDOTA1"],"extended ota 2":["EXTENDEDOTA2"],"extended ota 3":["EXTENDEDOTA3"],"flexible rate ota":["FLEXIBLEOTA"],"free cancellation":["14NFLEX","14NFLEXLOYALTY","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXPROMO","EXTENDEDOTA1D","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","MIDTERM","MIDTERMLOYALTY","MIDTERMPROMO"],"free cancellation 14 days in advance":["DIRECTLOS3"],"free cancellation 30 days in advance":["DIRECTLOS7"],"free cancellation 42 days in advance":["DIRECTLOS14"],"free cancellation 7 days in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 90 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE","NRFRATELOYALTY","NRFRATEPROMO"],"non refundable rate ota":["NRFRATEOTA"]},"COURTFIELD":{"1. flexible rate studio lower ground":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2. flexible rate studio":["FLEXIBLE"],"3. flexible rate deluxe studio":["FLEXIBLE"],"3nights flexible rate":["3NFLEX"],"3nights flexible rate ota":["3NFLEXOTA"],"4. flexible rate superior studio lower ground":["FLEXIBLE"],"5. flexible rate 1 bed apartment":["FLEXIBLE"],"5nights flexible rate ota":["5NFLEXOTA"],"7nights flexible rate ota":["7NFLEXOTA"],"free cancellation":["14NFLEX","5NFLEX","7NFLEX"],"free cancellation 1 day in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 14 days in advance":["DIRECTLOS14"],"free cancellation 3 days in advance":["DIRECTLOS3"],"free cancellation 30 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS7"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE"],"non refundable rate ota":["NRFRATEOTA"]},"DTH":{"1. flexible rate studio":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2. flexible rate superior studio":["FLEXIBLE"],"2nights flexible rate ota":["2NFLEXOTA"],"2nights loyalty discount rate":["2NFLEXOTALOYALTY"],"3. flexible rate superior studio with balcony":["FLEXIBLE"],"3nights flexible rate ota":["3NFLEXOTA"],"4. flexible rate deluxe penthouse studio":["FLEXIBLE"],"5nights flexible rate ota":["5NFLEXOTA"],"7nights flexible rate ota":["7NFLEXOTA"],"flexible rate ota":["FLEXIBLEOTA"],"free cancellation":["14NFLEX","14NFLEXLOYALTY","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXPROMO","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","MIDTERM","MIDTERMLOYALTY","MIDTERMPROMO"],"free cancellation 1 day in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 14 days in advance":["DIRECTLOS14"],"free cancellation 3 days in advance":["DIRECTLOS3"],"free cancellation 30 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS7"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE","NRFRATELOYALTY","NRFRATEPROMO"],"non refundable rate ota":["NRFRATEOTA"]},"ECCLESTON":{"1. flexible rate 1 bedroom apartment":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2. flexible rate 1 bedroom deluxe apartment":["FLEXIBLE"],"2nights flexible rate ota":["2NFLEXOTA"],"3. flexible rate 2 bedroom apartment":["FLEXIBLE"],"3nights flexible rate ota":["3NFLEXOTA"],"4. flexible rate 2 bedroom deluxe apartment":["FLEXIBLE"],"5nights flexible rate ota":["5NFLEXOTA"],"7nights flexible rate ota":["7NFLEXOTA"],"extended ota 1":["EXTENDEDOTA1"],"extended ota 2":["EXTENDEDOTA2"],"extended ota 3":["EXTENDEDOTA3"],"flexible rate ota":["FLEXIBLEOTA"],"free cancellation":["14NFLEX","14NFLEXLOYALTY","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXPROMO","EXTENDEDDIRECT1","EXTENDEDIRECT1","EXTENDEDIRECT2","EXTENDEDIRECT3","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","MIDTERM","MIDTERMLOYALTY","MIDTERMPROMO"],"free cancellation 14 days in advance":["DIRECTLOS7"],"free cancellation 3 days in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 30 days in advance":["DIRECTLOS14"],"free cancellation 45 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS3"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE","NRFRATELOYALTY","NRFRATEPROMO"],"non refundable rate ota":["NRFRATEOTA"]},"HARROW":{"1. flexible rate apex small studios":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2. flexible rate studio apartment":["FLEXIBLE"],"2nights flexible rate ota":["2NFLEXOTA"],"3. flexible rate standard deluxe":["FLEXIBLE"],"3nights flexible rate ota":["3NFLEXOTA"],"4. flexible rate penthouse studio":["FLEXIBLE"],"5nights flexible rate ota":["5NFLEXOTA"],"7nights flexible rate ota":["7NFLEXOTA"],"flexible rate ota":["FLEXIBLEOTA"],"free cancellation":["14NFLEX","14NFLEXLOYALTY","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXPROMO","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","MIDTERM","MIDTERMLOYALTY","MIDTERMPROMO"],"free cancellation 1 day in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 14 days in advance":["DIRECTLOS14"],"free cancellation 3 days in advance":["DIRECTLOS3"],"free cancellation 30 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS7"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE","NRFRATELOYALTY","NRFRATEPROMO"],"non refundable rate ota":["NRFRATEOTA"]},"HERMES":{"1. flexible rate king room":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2. flexible rate superior king room":["FLEXIBLE"],"2nights flexible rate ota":["2NFLEXOTA"],"3. flexible rate king room with garden view":["FLEXIBLE"],"3nights flexible rate ota":["3NFLEXOTA"],"4. flexible rate deluxe king room":["FLEXIBLE"],"5. flexible rate deluxe loft":["FLEXIBLE"],"5nights flexible rate ota":["5NFLEXOTA"],"6. flexible rate family room":["FLEXIBLE"],"7. flexible rate deluxe family suite":["FLEXIBLE"],"7nights flexible rate ota":["7NFLEXOTA"],"flexible rate ota":["FLEXIBLEOTA"],"free cancellation":["14NFLEX","2NFLEX","3NFLEX","3NFLEXPROMO","5NFLEX","7NFLEX","FLEXDIRECT","MIDTERM"],"free cancellation 1 day in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 14 days in advance":["DIRECTLOS14"],"free cancellation 3 days in advance":["DIRECTLOS3"],"free cancellation 30 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS7"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE"],"non refundable rate ota":["NRFRATEOTA"]},"KINGSYARD":{"1. flexible rate 2 bedroom apartment deluxe":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2. flexible rate 2 bedroom apartment deluxe ground floor":["FLEXIBLE"],"2nights flexible rate ota":["2NFLEXOTA"],"3nights flexible rate ota":["3NFLEXOTA"],"5nights flexible rate ota":["5NFLEXOTA"],"7nights flexible rate ota":["7NFLEXOTA"],"extended ota 1":["EXTENDEDOTA1"],"extended ota 2":["EXTENDEDOTA2"],"extended ota 3":["EXTENDEDOTA3"],"flexible rate ota":["FLEXIBLEOTA"],"free cancellation":["14NFLEX","14NFLEXLOYALTY","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXPROMO","EXTENDEDDIRECT1","EXTENDEDDIRECT2","EXTENDEDDIRECT3","EXTENDEDOTA1","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","MIDTERM","MIDTERMLOYALTY","MIDTERMPROMO"],"free cancellation 14 days in advance":["DIRECTLOS7"],"free cancellation 3 days in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 30 days in advance":["DIRECTLOS14"],"free cancellation 45 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS3"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE","NRFRATELOYALTY","NRFRATEPROMO"],"non refundable rate ota":["NRFRATEOTA"]},"MADDOX":{"1. flexible rate 2 bedroom apartment":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2. flexible rate 3 bedroom apartment lg":["FLEXIBLE"],"2nights flexible rate ota":["2NFLEXOTA"],"2nights loyalty discount rate":["2NFLEXOTALOYALTY"],"2nights promo discount rate":["2NFLEXOTAPROMO"],"3. flexible rate 3 bedroom apartment":["FLEXIBLE"],"3nights flexible rate ota":["3NFLEXOTA"],"5nights flexible rate ota":["5NFLEXOTA"],"7nights flexible rate ota":["7NFLEXOTA"],"flexible rate ota":["FLEXIBLEOTA"],"free cancellation":["14NFLEX","14NFLEXLOYALTY","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXPROMO","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","MIDTERM","MIDTERMLOYALTY","MIDTERMPROMO","TESTRATE"],"free cancellation 14 days in advance":["DIRECTLOS7"],"free cancellation 3 days in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 30 days in advance":["DIRECTLOS14"],"free cancellation 45 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS3"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE","NRFRATELOYALTY","NRFRATEPROMO"],"non refundable rate ota":["NRFRATEOTA"]},"REGENCY":{"1. flexible rate studio apartment lg":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2. flexible rate 1 bedroom apartment lg":["FLEXIBLE"],"2nights flexible rate ota":["2NFLEXOTA"],"3. flexible rate 1 bedroom apartment":["FLEXIBLE"],"3nights flexible rate ota":["3NFLEXOTA"],"4. flexible rate 2 bedroom apartment lg":["FLEXIBLE"],"5. flexible rate 2 bedroom apartment 1bath":["FLEXIBLE"],"5nights flexible rate ota":["5NFLEXOTA"],"6. flexible rate 2 bedroom apartment":["FLEXIBLE"],"7. flexible rate 2 bedroom apartment w.mezzanine":["FLEXIBLE"],"7nights flexible rate ota":["7NFLEXOTA"],"8. flexible rate 3 bedroom apartment":["FLEXIBLE"],"flexible rate ota":["FLEXIBLEOTA"],"free cancellation":["14NFLEX","14NFLEXLOYALTY","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXPROMO","FLEXDIRECT","FLEXLOYALTY","FLEXMEMBERPROMO","FLEXPROMO","MEMBERFLEX","MIDTERM","MIDTERMLOYALTY","MIDTERMPROMO","TESTRATE"],"free cancellation 14 days in advance":["DIRECTLOS7"],"free cancellation 3 days in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 30 days in advance":["DIRECTLOS14"],"free cancellation 45 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS3"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE","NRFRATELOAYLATY","NRFRATELOYALTY","NRFRATEPROMO"],"non refundable rate ota":["NRFRATEOTA"],"test rate":["TEST100"]},"WARWICK":{"1. flexible rate standard double lower ground":["FLEXIBLE"],"14nights flexible rate ota":["14NFLEXOTA"],"2. flexible rate standard double":["FLEXIBLE"],"2nights flexible rate ota":["2NFLEXOTA"],"3. flexible rate king":["FLEXIBLE"],"3nights flexible rate ota":["3NFLEXOTA"],"4. flexible rate family":["FLEXIBLE"],"5nights flexible rate ota":["5NFLEXOTA"],"7nights flexible rate ota":["7NFLEXOTA"],"flexible rate ota":["FLEXIBLEOTA"],"free cancellation":["14NFLEX","14NFLEXLOYALTY","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXPROMO","FLEXDIRECT","FLEXLOYALTY","FLEXPROMO","MIDTERM","MIDTERMLOYALTY","MIDTERMPROMO"],"free cancellation 1 day in advance":["DIRECTLOS1","DIRECTLOS2"],"free cancellation 14 days in advance":["DIRECTLOS14"],"free cancellation 3 days in advance":["DIRECTLOS3"],"free cancellation 30 days in advance":["SEMIFLEXLOS14","SEMIFLEXLOS3","SEMIFLEXLOS7"],"free cancellation 7 days in advance":["DIRECTLOS7"],"midterm ota":["MIDTERMOTA"],"non refundable":["NRFLOS1","NRFLOS14","NRFLOS2","NRFLOS3","NRFLOS7","NRFRATE","NRFRATELOYALTY","NRFRATEPROMO","NRLOYALTY"],"non refundable rate ota":["NRFRATEOTA"]}},"NB":{"6KP":["14NFLEX","14NFLEXOTA","3NFLEX","3NFLEXOTA","5NFLEX","5NFLEXOTA","7NFLEX","7NFLEXOTA","FLEXIBLE","MIDTERMOTA","NRFRATE","NRFRATEOTA"],"ANTIGAL":[],"BAKERY":["2NFLEX","2NFLEXLOYALTY","2NFLEXOTA","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXOTA","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXOTA","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXOTA","7NFLEXPROMO","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","FLEXIBLE","FLEXIBLEOTA","MIDTERM","MIDTERMLOYALTY","MIDTERMOTA","MIDTERMPROMO","NRFRATE","NRFRATELOYALTY","NRFRATEOTA","NRFRATEPROMO"],"BOURNE":[],"BRONDBRY":["14NFLEXLOYALTY","14NFLEXOTA","2NFLEX","2NFLEXOTA","3NFLEX","3NFLEXLOYALTY","3NFLEXOTA","5NFLEX","5NFLEXOTA","7NFLEX","7NFLEXLOYALTY","7NFLEXOTA","FLEXDIRECT","FLEXIBLE","FLEXIBLEOTA","MIDTERM","MIDTERMOTA","NRFRATE","NRFRATEOTA"],"CARLYSLE":["3NFLEXOTA","5NFLEX","5NFLEXOTA","7NFLEXOTA","FLEXIBLE","MIDTERMOTA"],"CHENISTON":[],"CLARIDGE":["14NFLEX","14NFLEXLOYALTY","14NFLEXOTA","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXOTA","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXOTA","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXOTA","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXOTA","7NFLEXPROMO","DIRECTLOS2","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","FLEXIBLE","FLEXIBLEOTA","MIDTERM","MIDTERMLOYALTY","MIDTERMOTA","MIDTERMPROMO","NRFLOS1","NRFLOS2","NRFRATE","NRFRATELOYALTY","NRFRATEOTA","NRFRATEPROMO","OTALOS1","OTALOS2","OTASEMILOS1","OTASEMILOS2"],"COURTFIELD":["14NFLEX","14NFLEXOTA","3NFLEX","3NFLEXOTA","5NFLEX","5NFLEXOTA","7NFLEX","7NFLEXOTA","FLEXIBLE","MIDTERMOTA","NRFRATE","NRFRATEOTA"],"DTH":[],"ECCLESTON":["14NFLEX","14NFLEXLOYALTY","14NFLEXOTA","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXOTA","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXOTA","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXOTA","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXOTA","7NFLEXPROMO","EXTENDEDDIRECT1","EXTENDEDIRECT1","EXTENDEDIRECT2","EXTENDEDIRECT3","EXTENDEDOTA1","EXTENDEDOTA2","EXTENDEDOTA3","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","FLEXIBLE","FLEXIBLEOTA","MIDTERM","MIDTERMLOYALTY","MIDTERMOTA","MIDTERMPROMO","NRFRATE","NRFRATELOYALTY","NRFRATEOTA","NRFRATEPROMO"],"HARROW":["14NFLEX","14NFLEXLOYALTY","14NFLEXOTA","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXOTA","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXOTA","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXOTA","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXOTA","7NFLEXPROMO","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","FLEXIBLE","FLEXIBLEOTA","MIDTERM","MIDTERMLOYALTY","MIDTERMOTA","MIDTERMPROMO","NRFRATE","NRFRATELOYALTY","NRFRATEOTA","NRFRATEPROMO"],"HERMES":["14NFLEX","14NFLEXOTA","2NFLEX","2NFLEXOTA","3NFLEX","3NFLEXOTA","3NFLEXPROMO","5NFLEX","5NFLEXOTA","7NFLEX","7NFLEXOTA","FLEXDIRECT","FLEXIBLE","FLEXIBLEOTA","MIDTERM","MIDTERMOTA","NRFRATE","NRFRATEOTA"],"KINGSYARD":["14NFLEX","14NFLEXLOYALTY","14NFLEXOTA","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXOTA","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXOTA","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXOTA","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXOTA","7NFLEXPROMO","EXTENDEDDIRECT1","EXTENDEDDIRECT2","EXTENDEDDIRECT3","EXTENDEDOTA1","EXTENDEDOTA2","EXTENDEDOTA3","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","FLEXIBLE","FLEXIBLEOTA","MIDTERM","MIDTERMLOYALTY","MIDTERMOTA","MIDTERMPROMO","NRFRATE","NRFRATELOYALTY","NRFRATEOTA","NRFRATEPROMO"],"MADDOX":["14NFLEX","14NFLEXLOYALTY","14NFLEXOTA","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXOTA","2NFLEXOTALOYALTY","2NFLEXOTAPROMO","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXOTA","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXOTA","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXOTA","7NFLEXPROMO","FLEXDIRECT","FLEXDIRECTLOYALTY","FLEXDIRECTPROMO","FLEXIBLE","FLEXIBLEOTA","MIDTERM","MIDTERMLOYALTY","MIDTERMOTA","MIDTERMPROMO","NRFRATE","NRFRATELOYALTY","NRFRATEOTA","NRFRATEPROMO","TESTRATE"],"REGENCY":[],"WARWICK":["14NFLEX","14NFLEXLOYALTY","14NFLEXOTA","14NFLEXPROMO","2NFLEX","2NFLEXLOYALTY","2NFLEXOTA","2NFLEXPROMO","3NFLEX","3NFLEXLOYALTY","3NFLEXOTA","3NFLEXPROMO","5NFLEX","5NFLEXLOYALTY","5NFLEXOTA","5NFLEXPROMO","7NFLEX","7NFLEXLOYALTY","7NFLEXOTA","7NFLEXPROMO","FLEXDIRECT","FLEXIBLE","FLEXIBLEOTA","FLEXLOYALTY","FLEXPROMO","MIDTERM","MIDTERMLOYALTY","MIDTERMOTA","MIDTERMPROMO","NRFRATE","NRFRATELOYALTY","NRFRATEOTA","NRFRATEPROMO","NRLOYALTY"]},"PLAN":{"6KP":{"14NFLEX":"SF7D","14NFLEXOTA":"SF7D","3NFLEX":"FLEX3N","3NFLEXOTA":"FLEX3N","5NFLEX":"FLEX3N","5NFLEXOTA":"FLEX3N","7NFLEX":"SF7D","7NFLEXOTA":"SF7D","DIRECTLOS1":"F24H","DIRECTLOS14":"SEMIFLEX14","DIRECTLOS2":"F24H","DIRECTLOS3":"FLEX3N","DIRECTLOS7":"SF7D","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","FLEXIBLE":"F24H","MIDTERMOTA":"SEMIFLEX14","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATEOTA":"NONREF","OTALOS1":"FLEX3N","OTALOS14":"SEMIFLEX","OTALOS2":"FLEX3N","OTALOS3":"SF7D","OTALOS7":"SEMIFLEX14","OTASEMILOS1":"SEMI42D","OTASEMILOS14":"SEMI42D","OTASEMILOS2":"SEMI42D","OTASEMILOS3":"SEMI42D","OTASEMILOS7":"SEMI42D","PROMOOTALOS1":"FLEX3N","PROMOOTALOS2":"FLEX3N","PROMOOTALOS3":"SF7D","SEMIFLEXLOS14":"SEMIFLEX","SEMIFLEXLOS3":"SEMIFLEX","SEMIFLEXLOS7":"SEMIFLEX"},"ANTIGAL":{"3NFLEX":"FLEX3N","3NFLEXOTA":"FLEX3N","DIRECTLOS1":"F24H","DIRECTLOS14":"SEMIFLEX14","DIRECTLOS2":"F24H","DIRECTLOS7":"FLEX1","FLEXIBLE":"F24H","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","OTALOS1":"FLEX3N","OTALOS14":"SEMI30D","OTALOS2":"FLEX3N","OTALOS7":"SEMIFLEX14","OTASEMIFLEXLOS1":"SEMIFLEX","OTASEMIFLEXLOS14":"SEMIFLEX","OTASEMIFLEXLOS2":"SEMIFLEX","OTASEMIFLEXLOS3":"SEMIFLEX","OTASEMIFLEXLOS7":"SEMIFLEX","PROMOOTALOS3":"FLEX3N","SEMIFLEXLOS14":"SEMI30D","SEMIFLEXLOS3":"SEMI30D","SEMIFLEXLOS7":"SEMI30D"},"BAKERY":{"2NFLEX":"F24H","2NFLEXLOYALTY":"F24H","2NFLEXOTA":"F24H","2NFLEXPROMO":"F24H","3NFLEX":"FLEX3N","3NFLEXLOYALTY":"FLEX3N","3NFLEXOTA":"FLEX3N","3NFLEXPROMO":"FLEX3N","5NFLEX":"FLEX3N","5NFLEXLOYALTY":"FLEX3N","5NFLEXOTA":"FLEX3N","5NFLEXPROMO":"FLEX3N","7NFLEX":"SF7D","7NFLEXLOYALTY":"SF7D","7NFLEXOTA":"SF7D","7NFLEXPROMO":"SF7D","DIRECTLOS1":"F24H","DIRECTLOS14":"SEMIFLEX14","DIRECTLOS2":"F24H","DIRECTLOS3":"FLEX3N","DIRECTLOS7":"SF7D","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","FLEXDIRECT":"F24H","FLEXDIRECTLOYALTY":"F24H","FLEXDIRECTPROMO":"F24H","FLEXIBLE":"F24H","FLEXIBLEOTA":"F24H","MIDTERM":"SEMIFLEX14","MIDTERMLOYALTY":"SEMIFLEX14","MIDTERMOTA":"SEMIFLEX14","MIDTERMPROMO":"SEMIFLEX14","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATELOYALTY":"NONREF","NRFRATEOTA":"NONREF","NRFRATEPROMO":"NONREF","OTALOS1":"FLEX3N","OTALOS14":"SEMIFLEX","OTALOS2":"FLEX3N","OTALOS3":"SF7D","OTALOS7":"SEMIFLEX14","OTASEMILOS1":"SEMI42D","OTASEMILOS14":"SEMI42D","OTASEMILOS2":"SEMI42D","OTASEMILOS3":"SEMI42D","OTASEMILOS7":"SEMI42D","PROMOOTALOS1":"FLEX3N","PROMOOTALOS2":"FLEX3N","PROMOOTALOS3":"SF7D","SEMIFLEXLOS14":"SEMIFLEX","SEMIFLEXLOS3":"SEMIFLEX","SEMIFLEXLOS7":"SEMIFLEX"},"BOURNE":{"DIRECTLOS1":"FLEX3N","DIRECTLOS14":"SEMI30D","DIRECTLOS2":"FLEX3N","DIRECTLOS3":"FLEX7N","DIRECTLOS7":"SEMIFLEX15","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","OTALOS1":"FLEX7N","OTALOS14":"SEMI42D","OTALOS2":"FLEX7N","OTALOS3":"SEMIFLEX15","OTALOS7":"SEMI30D","OTASEMILOS1":"SEMI60D","OTASEMILOS14":"SEMI60D","OTASEMILOS2":"SEMI60D","OTASEMILOS3":"SEMI60D","OTASEMILOS7":"SEMI60D","PROMOOTALOS1":"FLEX7N","PROMOOTALOS2":"FLEX7N","PROMOOTALOS3":"SEMIFLEX15","SEMIFLEXLOS14":"SEMI45D","SEMIFLEXLOS3":"SEMI45D","SEMIFLEXLOS7":"SEMI45D"},"BRONDBRY":{"14NFLEXLOYALTY":"F7D","14NFLEXOTA":"F7D","2NFLEX":"F24H","2NFLEXOTA":"F24H","3NFLEX":"F3D","3NFLEXLOYALTY":"F3D","3NFLEXOTA":"F3D","5NFLEX":"F3D","5NFLEXOTA":"F3D","7NFLEX":"F7D","7NFLEXLOYALTY":"F7D","7NFLEXOTA":"F7D","DIRECTLOS1":"F24H","DIRECTLOS14":"SEMIFLEX14","DIRECTLOS2":"F24H","DIRECTLOS3":"F3D","DIRECTLOS7":"F7D","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","FLEXDIRECT":"F24H","FLEXIBLE":"F24H","FLEXIBLEOTA":"F24H","MIDTERM":"SEMIFLEX14","MIDTERMOTA":"SEMIFLEX14","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATEOTA":"NONREF","OTALOS1":"F3D","OTALOS14":"SEMIFLEX","OTALOS2":"F3D","OTALOS3":"F7D","OTALOS7":"SEMIFLEX14","OTASEMILOS1":"SEMI42D","OTASEMILOS14":"SEMI42D","OTASEMILOS2":"SEMI42D","OTASEMILOS3":"SEMI42D","OTASEMILOS7":"SEMI42D","PROMOOTALOS1":"F3D","PROMOOTALOS2":"F3D","PROMOOTALOS3":"F7D","SEMIFLEXLOS14":"SEMIFLEX","SEMIFLEXLOS3":"SEMIFLEX","SEMIFLEXLOS7":"SEMIFLEX"},"CARLYSLE":{"3NFLEXOTA":"FLEX3N","5NFLEX":"FLEX7N","5NFLEXOTA":"FLEX7N","7NFLEXOTA":"FLEX7N","AGENCY1LOS3":{"2BEDROOM":"SEMIFLEX15","3BEDROOM":"SEMI30D","4BEDROOM7":"SEMI30D","4BEDROOM8":"SEMI30D"},"AGENCY1LOS30":{"2BEDROOM":"SEMIFLEX15","3BEDROOM":"SEMI30D","4BEDROOM7":"SEMI30D","4BEDROOM8":"SEMI30D"},"AGENCY2LOS3":{"2BEDROOM":"SEMIFLEX15","3BEDROOM":"SEMI30D","4BEDROOM7":"SEMI30D","4BEDROOM8":"SEMI30D"},"AGENCY2LOS30":{"2BEDROOM":"SEMIFLEX15","3BEDROOM":"SEMI30D","4BEDROOM7":"SEMI30D","4BEDROOM8":"SEMI30D"},"DIRECTLOS1":"FLEX3N","DIRECTLOS14":"SEMI30D","DIRECTLOS2":"FLEX3N","DIRECTLOS3":"FLEX7N","DIRECTLOS7":"SEMIFLEX15","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","FLEXIBLE":{"2BEDROOM":"F24H","3BEDROOM":"FLEX3N","4BEDROOM7":"FLEX3N","4BEDROOM8":"FLEX3N"},"MIDTERMOTA":"SEMIFLEX15","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","OTALOS1":"FLEX7N","OTALOS14":"SEMI42D","OTALOS2":"FLEX7N","OTALOS3":"SEMIFLEX15","OTALOS7":"SEMI30D","OTASEMILOS1":"SEMI60D","OTASEMILOS14":"SEMI60D","OTASEMILOS2":"SEMI60D","OTASEMILOS3":"SEMI60D","OTASEMILOS7":"SEMI60D","PROMOOTALOS1":"FLEX7N","PROMOOTALOS2":"FLEX7N","PROMOOTALOS3":"SEMIFLEX15","SEMIFLEXLOS14":"SEMI45D","SEMIFLEXLOS3":"SEMI45D","SEMIFLEXLOS7":"SEMI45D"},"CHENISTON":{"DIRECTLOS1":"F24H","DIRECTLOS14":"SEMIFLEX15","DIRECTLOS2":"F24H","DIRECTLOS3":"FLEX3N","DIRECTLOS7":"FLEX7N","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","OTALOS1":"FLEX3N","OTALOS14":"SEMI30D","OTALOS2":"FLEX3N","OTALOS3":"FLEX7N","OTALOS7":"SEMIFLEX15","OTASEMILOS1":"SEMI42D","OTASEMILOS14":"SEMI42D","OTASEMILOS2":"SEMI42D","OTASEMILOS3":"SEMI42D","OTASEMILOS7":"SEMI42D","PROMOOTALOS1":"FLEX3N","PROMOOTALOS2":"FLEX3N","PROMOOTALOS3":"FLEX7N","SEMIFLEXLOS14":"SEMI30D","SEMIFLEXLOS3":"SEMI30D","SEMIFLEXLOS7":"SEMI30D"},"CLARIDGE":{"14NFLEX":{"D1BD":"FLEX1","DSTU":"SEMIFLEX14","STU":"SEMIFLEX14","STUB":"SEMIFLEX14","STUL":"FLEX1"},"14NFLEXLOYALTY":{"D1BD":"FLEX1","DSTU":"SEMIFLEX14","STU":"SEMIFLEX14","STUB":"SEMIFLEX14","STUL":"FLEX1"},"14NFLEXOTA":{"D1BD":"FLEX1","DSTU":"SEMIFLEX14","STU":"SEMIFLEX14","STUB":"SEMIFLEX14","STUL":"FLEX1"},"14NFLEXPROMO":{"D1BD":"FLEX1","DSTU":"SEMIFLEX14","STU":"SEMIFLEX14","STUB":"SEMIFLEX14","STUL":"FLEX1"},"2NFLEX":{"D1BD":"F24H","DSTU":"F3D","STU":"F24H","STUB":"F24H","STUL":"F24H"},"2NFLEXLOYALTY":{"D1BD":"F24H","DSTU":"F3D","STU":"F24H","STUB":"F24H","STUL":"F24H"},"2NFLEXOTA":{"D1BD":"F24H","DSTU":"F3D","STU":"F24H","STUB":"F24H","STUL":"F24H"},"2NFLEXPROMO":{"D1BD":"F24H","DSTU":"F3D","STU":"F24H","STUB":"F24H","STUL":"F24H"},"3NFLEX":"F3D","3NFLEXLOYALTY":"F3D","3NFLEXOTA":"F3D","3NFLEXPROMO":"F3D","5NFLEX":{"D1BD":"F3D","DSTU":"FLEX1","STU":"FLEX1","STUB":"FLEX1","STUL":"F3D"},"5NFLEXLOYALTY":{"D1BD":"F3D","DSTU":"FLEX1","STU":"FLEX1","STUB":"FLEX1","STUL":"F3D"},"5NFLEXOTA":{"D1BD":"F3D","DSTU":"FLEX1","STU":"FLEX1","STUB":"FLEX1","STUL":"F3D"},"5NFLEXPROMO":{"D1BD":"F3D","DSTU":"FLEX1","STU":"FLEX1","STUB":"FLEX1","STUL":"F3D"},"7NFLEX":{"D1BD":"FLEX1","DSTU":"SEMIFLEX14","STU":"FLEX1","STUB":"FLEX1","STUL":"FLEX1"},"7NFLEXLOYALTY":{"D1BD":"FLEX1","DSTU":"SEMIFLEX14","STU":"FLEX1","STUB":"FLEX1","STUL":"FLEX1"},"7NFLEXOTA":{"D1BD":"FLEX1","DSTU":"SEMIFLEX14","STU":"FLEX1","STUB":"FLEX1","STUL":"FLEX1"},"7NFLEXPROMO":{"D1BD":"FLEX1","DSTU":"SEMIFLEX14","STU":"FLEX1","STUB":"FLEX1","STUL":"FLEX1"},"DIRECTLOS1":"FLEX1","DIRECTLOS14":"SEMI42D","DIRECTLOS2":"FLEX1","DIRECTLOS3":"SEMIFLEX14","DIRECTLOS7":"SEMIFLEX","EXTENDEDDIRECT1":"SEMIFLEX","EXTENDEDDIRECT2":"SEMIFLEX","EXTENDEDDIRECT3":"SEMIFLEX","EXTENDEDOTA1":"SEMIFLEX","EXTENDEDOTA1D":"SEMIFLEX","EXTENDEDOTA2":"SEMIFLEX","EXTENDEDOTA3":"SEMIFLEX","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","FLEXDIRECT":{"D1BD":"F24H","DSTU":"F3D","STU":"F24H","STUB":"F24H","STUL":"F24H"},"FLEXDIRECTLOYALTY":{"D1BD":"F24H","DSTU":"F3D","STU":"F24H","STUB":"F24H","STUL":"F24H"},"FLEXDIRECTPROMO":{"D1BD":"F24H","DSTU":"F3D","STU":"F24H","STUB":"F24H","STUL":"F24H"},"FLEXIBLE":{"D1BD":"F24H","DSTU":"F3D","STU":"F24H","STUB":"F24H","STUL":"F24H"},"FLEXIBLEOTA":{"D1BD":"F24H","DSTU":"F3D","STU":"F24H","STUB":"F24H","STUL":"F24H"},"MIDTERM":"SEMIFLEX14","MIDTERMLOYALTY":"SEMIFLEX14","MIDTERMOTA":"SEMIFLEX14","MIDTERMPROMO":"SEMIFLEX14","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATELOYALTY":"NONREF","NRFRATEOTA":"NONREF","NRFRATEPROMO":"NONREF","OTALOS1":"FLEX1","OTALOS14":"SEMI60D","OTALOS2":"FLEX1","OTALOS3":"SEMIFLEX","OTALOS7":"SEMI42D","OTASEMILOS1":"NONREF","OTASEMILOS14":"NONREF","OTASEMILOS2":"NONREF","OTASEMILOS3":"NONREF","OTASEMILOS7":"NONREF","PROMOOTALOS1":"FLEX1","PROMOOTALOS2":"FLEX1","PROMOOTALOS3":"SEMIFLEX","SEMIFLEXLOS14":"SEMI90D","SEMIFLEXLOS3":"SEMI90D","SEMIFLEXLOS7":"SEMI90D"},"COURTFIELD":{"14NFLEX":"F7D","14NFLEXOTA":"F7D","3NFLEX":"F3D","3NFLEXOTA":"F3D","5NFLEX":"F3D","5NFLEXOTA":"F3D","7NFLEX":"F7D","7NFLEXOTA":"F7D","DIRECTLOS1":"F24H","DIRECTLOS14":"SEMIFLEX","DIRECTLOS2":"F24H","DIRECTLOS3":"F3D","DIRECTLOS7":"F7D","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","FLEXIBLE":"F24H","MIDTERMOTA":"SEMIFLEX","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATEOTA":"NONREF","OTALOS1":"F3D","OTALOS14":"SEMIFLEX30","OTALOS2":"F3D","OTALOS3":"F7D","OTALOS7":"SEMIFLEX","OTASEMILOS1":"SEMI42D","OTASEMILOS14":"SEMI42D","OTASEMILOS2":"SEMI42D","OTASEMILOS3":"SEMI42D","OTASEMILOS7":"SEMI42D","PROMOOTALOS1":"F3D","PROMOOTALOS2":"F3D","PROMOOTALOS3":"F7D","SEMIFLEXLOS14":"SEMIFLEX30","SEMIFLEXLOS3":"SEMIFLEX30","SEMIFLEXLOS7":"SEMIFLEX30"},"DTH":{"14NFLEX":"FLEX1","14NFLEXLOYALTY":"FLEX1","14NFLEXOTA":"FLEX1","14NFLEXPROMO":"FLEX1","2NFLEX":"F24H","2NFLEXLOYALTY":"F24H","2NFLEXOTA":"F24H","2NFLEXOTALOYALTY":"F24H","2NFLEXPROMO":"F24H","3NFLEX":"FLEX3N","3NFLEXLOYALTY":"FLEX3N","3NFLEXOTA":"FLEX3N","3NFLEXPROMO":"FLEX3N","5NFLEX":"FLEX3N","5NFLEXLOYALTY":"FLEX3N","5NFLEXOTA":"FLEX3N","5NFLEXPROMO":"FLEX3N","7NFLEX":"FLEX1","7NFLEXLOYALTY":"FLEX1","7NFLEXOTA":"FLEX1","7NFLEXPROMO":"FLEX1","DIRECTLOS1":"F24H","DIRECTLOS14":"SEMIFLEX14","DIRECTLOS2":"F24H","DIRECTLOS3":"FLEX3N","DIRECTLOS7":"FLEX1","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","FLEXDIRECT":"F24H","FLEXDIRECTLOYALTY":"F24H","FLEXDIRECTPROMO":"F24H","FLEXIBLE":"F24H","FLEXIBLEOTA":"F24H","MIDTERM":"SEMIFLEX14","MIDTERMLOYALTY":"SEMIFLEX14","MIDTERMOTA":"SEMIFLEX14","MIDTERMPROMO":"SEMIFLEX14","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATELOYALTY":"NONREF","NRFRATEOTA":"NONREF","NRFRATEPROMO":"NONREF","OTALOS1":"FLEX3N","OTALOS14":"SEMI30D","OTALOS2":"FLEX3N","OTALOS3":"FLEX1","OTALOS7":"SEMIFLEX14","OTASEMILOS1":"SEMI42D","OTASEMILOS14":"SEMI42D","OTASEMILOS2":"SEMI42D","OTASEMILOS3":"SEMI42D","OTASEMILOS7":"SEMI42D","PROMOOTALOS1":"FLEX3N","PROMOOTALOS2":"FLEX3N","PROMOOTALOS3":"FLEX1","SEMIFLEXLOS14":"SEMI30D","SEMIFLEXLOS3":"SEMI30D","SEMIFLEXLOS7":"SEMI30D"},"ECCLESTON":{"14NFLEX":{"DSTU":"SEMIFLEX14","STU":"SEMIFLEX14","STUB":"FLEX1","STUL":"FLEX1"},"14NFLEXLOYALTY":{"DSTU":"SEMIFLEX14","STU":"SEMIFLEX14","STUB":"FLEX1","STUL":"FLEX1"},"14NFLEXOTA":{"DSTU":"SEMIFLEX14","STU":"SEMIFLEX14","STUB":"FLEX1","STUL":"FLEX1"},"14NFLEXPROMO":{"DSTU":"SEMIFLEX14","STU":"SEMIFLEX14","STUB":"FLEX1","STUL":"FLEX1"},"2NFLEX":"F24H","2NFLEXLOYALTY":"F24H","2NFLEXOTA":"F24H","2NFLEXPROMO":"F24H","3NFLEX":"FLEX3N","3NFLEXLOYALTY":"FLEX3N","3NFLEXOTA":"FLEX3N","3NFLEXPROMO":"FLEX3N","5NFLEX":{"DSTU":"FLEX1","STU":"FLEX1","STUB":"FLEX3N","STUL":"FLEX3N"},"5NFLEXLOYALTY":{"DSTU":"FLEX1","STU":"FLEX1","STUB":"FLEX3N","STUL":"FLEX3N"},"5NFLEXOTA":{"DSTU":"FLEX1","STU":"FLEX1","STUB":"FLEX3N","STUL":"FLEX3N"},"5NFLEXPROMO":{"DSTU":"FLEX1","STU":"FLEX1","STUB":"FLEX3N","STUL":"FLEX3N"},"7NFLEX":"FLEX1","7NFLEXLOYALTY":"FLEX1","7NFLEXOTA":"FLEX1","7NFLEXPROMO":"FLEX1","DIRECTLOS1":"FLEX3N","DIRECTLOS14":"SEMIFLEX","DIRECTLOS2":"FLEX3N","DIRECTLOS3":"FLEX1","DIRECTLOS7":"SEMIFLEX14","EXTENDEDDIRECT1":"SEMIFLEX","EXTENDEDIRECT1":"SEMIFLEX","EXTENDEDIRECT2":"SEMIFLEX","EXTENDEDIRECT3":"SEMIFLEX","EXTENDEDOTA1":"SEMIFLEX","EXTENDEDOTA2":"SEMIFLEX","EXTENDEDOTA3":"SEMIFLEX","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","FLEXDIRECT":"F24H","FLEXDIRECTLOYALTY":"F24H","FLEXDIRECTPROMO":"F24H","FLEXIBLE":"F24H","FLEXIBLEOTA":"F24H","MIDTERM":"SEMIFLEX14","MIDTERMLOYALTY":"SEMIFLEX14","MIDTERMOTA":"SEMIFLEX14","MIDTERMPROMO":"SEMIFLEX14","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATELOYALTY":"NONREF","NRFRATEOTA":"NONREF","NRFRATEPROMO":"NONREF","OTALOS1":"FLEX1","OTALOS14":"SEMI42D","OTALOS2":"FLEX1","OTALOS3":"SEMIFLEX14","OTALOS7":"SEMIFLEX","OTASEMILOS1":"SEMI60D","OTASEMILOS14":"SEMI60D","OTASEMILOS2":"SEMI60D","OTASEMILOS3":"SEMI60D","OTASEMILOS7":"SEMI60D","SEMIFLEXLOS14":"SEMI45D","SEMIFLEXLOS3":"SEMI45D","SEMIFLEXLOS7":"SEMI45D"},"HARROW":{"14NFLEX":"SF7D","14NFLEXLOYALTY":"SF7D","14NFLEXOTA":"SF7D","14NFLEXPROMO":"SF7D","2NFLEX":"F24H","2NFLEXLOYALTY":"F24H","2NFLEXOTA":"F24H","2NFLEXPROMO":"F24H","3NFLEX":"F3D","3NFLEXLOYALTY":"F3D","3NFLEXOTA":"F3D","3NFLEXPROMO":"F3D","5NFLEX":"F3D","5NFLEXLOYALTY":"F3D","5NFLEXOTA":"F3D","5NFLEXPROMO":"F3D","7NFLEX":"SF7D","7NFLEXLOYALTY":"SF7D","7NFLEXOTA":"SF7D","7NFLEXPROMO":"SF7D","DIRECTLOS1":"F24H","DIRECTLOS14":"SEMIFLEX14","DIRECTLOS2":"F24H","DIRECTLOS3":"F3D","DIRECTLOS7":"SF7D","FLEXDIRECT":"F24H","FLEXDIRECTLOYALTY":"F24H","FLEXDIRECTPROMO":"F24H","FLEXIBLE":"F24H","FLEXIBLEOTA":"F24H","MIDTERM":"SEMIFLEX14","MIDTERMLOYALTY":"SEMIFLEX14","MIDTERMOTA":"SEMIFLEX14","MIDTERMPROMO":"SEMIFLEX14","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATELOYALTY":"NONREF","NRFRATEOTA":"NONREF","NRFRATEPROMO":"NONREF","OTALOS1":"F3D","OTALOS14":"SEMIFLEX","OTALOS2":"F3D","OTALOS3":"SF7D","OTALOS7":"SEMIFLEX14","OTASEMILOS1":"SEMI42D","OTASEMILOS14":"SEMI42D","OTASEMILOS2":"SEMI42D","OTASEMILOS3":"SEMI42D","OTASEMILOS7":"SEMI42D","PROMOOTALOS1":"F3D","PROMOOTALOS2":"F3D","PROMOOTALOS3":"SF7D","SEMIFLEXLOS14":"SEMIFLEX","SEMIFLEXLOS3":"SEMIFLEX","SEMIFLEXLOS7":"SEMIFLEX"},"HERMES":{"14NFLEX":"F7D","14NFLEXOTA":"F7D","2NFLEX":"F24H","2NFLEXOTA":"F24H","3NFLEX":"F3D","3NFLEXOTA":"F3D","3NFLEXPROMO":"F3D","5NFLEX":"F3D","5NFLEXOTA":"F3D","7NFLEX":"F7D","7NFLEXOTA":"F7D","DIRECTLOS1":"F24H","DIRECTLOS14":"SEMIFLEX","DIRECTLOS2":"F24H","DIRECTLOS3":"F3D","DIRECTLOS7":"F7D","FLEXDIRECT":"F24H","FLEXIBLE":"F24H","FLEXIBLEOTA":"F24H","MIDTERM":"SEMIFLEX","MIDTERMOTA":"SEMIFLEX","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATEOTA":"NONREF","OTALOS1":"F3D","OTALOS14":"SEMIFLEX30","OTALOS2":"F3D","OTALOS3":"F7D","OTALOS7":"SEMIFLEX","OTASEMILOS1":"SEMI42D","OTASEMILOS14":"SEMI42D","OTASEMILOS2":"SEMI42D","OTASEMILOS3":"SEMI42D","OTASEMILOS7":"SEMI42D","PROMOOTALOS1":"F3D","PROMOOTALOS2":"F3D","PROMOOTALOS3":"F7D","SEMIFLEXLOS14":"SEMIFLEX30","SEMIFLEXLOS3":"SEMIFLEX30","SEMIFLEXLOS7":"SEMIFLEX30"},"KINGSYARD":{"14NFLEX":"SEMIFLEX14","14NFLEXLOYALTY":"SEMIFLEX14","14NFLEXOTA":"SEMIFLEX14","14NFLEXPROMO":"SEMIFLEX14","2NFLEX":"F24H","2NFLEXLOYALTY":"F24H","2NFLEXOTA":"F24H","2NFLEXPROMO":"F24H","3NFLEX":"FLEX3N","3NFLEXLOYALTY":"FLEX3N","3NFLEXOTA":"FLEX3N","3NFLEXPROMO":"FLEX3N","5NFLEX":"FLEX1","5NFLEXLOYALTY":"FLEX1","5NFLEXOTA":"FLEX1","5NFLEXPROMO":"FLEX1","7NFLEX":"FLEX1","7NFLEXLOYALTY":"FLEX1","7NFLEXOTA":"FLEX1","7NFLEXPROMO":"FLEX1","DIRECTLOS1":"FLEX3N","DIRECTLOS14":"SEMIFLEX","DIRECTLOS2":"FLEX3N","DIRECTLOS3":"FLEX1","DIRECTLOS7":"SEMIFLEX14","EXTENDEDDIRECT1":"SEMIFLEX","EXTENDEDDIRECT2":"SEMIFLEX","EXTENDEDDIRECT3":"SEMIFLEX","EXTENDEDOTA1":"SEMIFLEX","EXTENDEDOTA2":"SEMIFLEX","EXTENDEDOTA3":"SEMIFLEX","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","FLEXDIRECT":"F24H","FLEXDIRECTLOYALTY":"F24H","FLEXDIRECTPROMO":"F24H","FLEXIBLE":"F24H","FLEXIBLEOTA":"F24H","MIDTERM":"SEMIFLEX14","MIDTERMLOYALTY":"SEMIFLEX14","MIDTERMOTA":"SEMIFLEX14","MIDTERMPROMO":"SEMIFLEX14","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATELOYALTY":"NONREF","NRFRATEOTA":"NONREF","NRFRATEPROMO":"NONREF","OTALOS1":"FLEX1","OTALOS14":"SEMI42D","OTALOS2":"FLEX1","OTALOS3":"SEMIFLEX14","OTALOS7":"SEMIFLEX","OTASEMILOS1":"SEMI60D","OTASEMILOS14":"SEMI60D","OTASEMILOS2":"SEMI60D","OTASEMILOS3":"SEMI60D","OTASEMILOS7":"SEMI60D","SEMIFLEXLOS14":"SEMI45D","SEMIFLEXLOS3":"SEMI45D","SEMIFLEXLOS7":"SEMI45D"},"MADDOX":{"14NFLEX":"SEMIFLEX14","14NFLEXLOYALTY":"SEMIFLEX14","14NFLEXOTA":"SEMIFLEX14","14NFLEXPROMO":"SEMIFLEX14","2NFLEX":{"STU":"F24H","STUB":"F3D","STUL":"F3D"},"2NFLEXLOYALTY":"F3D","2NFLEXOTA":{"STU":"F24H","STUB":"F3D","STUL":"F3D"},"2NFLEXOTALOYALTY":"F24H","2NFLEXOTAPROMO":"F24H","2NFLEXPROMO":"F3D","3NFLEX":"F3D","3NFLEXLOYALTY":"F3D","3NFLEXOTA":"F3D","3NFLEXPROMO":"F3D","5NFLEX":"SF7D","5NFLEXLOYALTY":"SF7D","5NFLEXOTA":"SF7D","5NFLEXPROMO":"SF7D","7NFLEX":{"STU":"SF7D","STUB":"SEMIFLEX14","STUL":"SEMIFLEX14"},"7NFLEXLOYALTY":{"STU":"SF7D","STUB":"SEMIFLEX14","STUL":"SEMIFLEX14"},"7NFLEXOTA":{"STU":"SF7D","STUB":"SEMIFLEX14","STUL":"SEMIFLEX14"},"7NFLEXPROMO":{"STU":"SF7D","STUB":"SEMIFLEX14","STUL":"SEMIFLEX14"},"DIRECTLOS1":"F3D","DIRECTLOS14":"SEMIFLEX","DIRECTLOS2":"F3D","DIRECTLOS3":"SF7D","DIRECTLOS7":"SEMIFLEX14","FLEXDIRECT":{"STU":"F24H","STUB":"F3D","STUL":"F3D"},"FLEXDIRECTLOYALTY":{"STU":"F24H","STUB":"F3D","STUL":"F3D"},"FLEXDIRECTPROMO":{"STU":"F24H","STUB":"F3D","STUL":"F3D"},"FLEXIBLE":{"STU":"F24H","STUB":"F3D","STUL":"F3D"},"FLEXIBLEOTA":{"STU":"F24H","STUB":"F3D","STUL":"F3D"},"MIDTERM":"SEMIFLEX14","MIDTERMLOYALTY":"SEMIFLEX14","MIDTERMOTA":"SEMIFLEX14","MIDTERMPROMO":"SEMIFLEX14","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATELOYALTY":"NONREF","NRFRATEOTA":"NONREF","NRFRATEPROMO":"NONREF","OTALOS1":"SF7D","OTALOS14":"SEMI42D","OTALOS2":"SF7D","OTALOS3":"SEMIFLEX14","OTALOS7":"SEMIFLEX","OTASEMILOS1":"SEMI60D","OTASEMILOS14":"SEMI60D","OTASEMILOS2":"SEMI60D","OTASEMILOS3":"SEMI60D","OTASEMILOS7":"SEMI60D","PROMOOTALOS1":"SF7D","PROMOOTALOS2":"SF7D","PROMOOTALOS3":"SEMIFLEX14","PROMOOTALOS7":"SEMIFLEX","SEMIFLEXLOS14":"SEMI45D","SEMIFLEXLOS3":"SEMI45D","SEMIFLEXLOS7":"SEMI45D","TESTRATE":"SEMIFLEX"},"REGENCY":{"14NFLEX":{"2BDLG":"SEMIFLEX","3BD":"SEMIFLEX","APA":"SEMIFLEX","DSTU":"SEMIFLEX","SDR":"F7D","STU":"SEMIFLEX","STUL":"F7D","STULG":"F7D"},"14NFLEXLOYALTY":{"2BDLG":"SEMIFLEX","3BD":"SEMIFLEX","APA":"SEMIFLEX","DSTU":"SEMIFLEX","SDR":"F7D","STU":"SEMIFLEX","STUL":"F7D","STULG":"F7D"},"14NFLEXOTA":{"2BDLG":"SEMIFLEX","3BD":"SEMIFLEX","APA":"SEMIFLEX","DSTU":"SEMIFLEX","SDR":"F7D","STU":"SEMIFLEX","STUL":"F7D","STULG":"F7D"},"14NFLEXPROMO":{"2BDLG":"SEMIFLEX","3BD":"SEMIFLEX","APA":"SEMIFLEX","DSTU":"SEMIFLEX","SDR":"F7D","STU":"SEMIFLEX","STUL":"F7D","STULG":"F7D"},"2NFLEX":{"2BDLG":"F24H","3BD":"F3D","APA":"F24H","DSTU":"F24H","SDR":"F24H","STU":"F24H","STUL":"F24H","STULG":"F24H"},"2NFLEXLOYALTY":{"2BDLG":"F24H","3BD":"F3D","APA":"F24H","DSTU":"F24H","SDR":"F24H","STU":"F24H","STUL":"F24H","STULG":"F24H"},"2NFLEXOTA":{"2BDLG":"F24H","3BD":"F3D","APA":"F24H","DSTU":"F24H","SDR":"F24H","STU":"F24H","STUL":"F24H","STULG":"F24H"},"2NFLEXPROMO":{"2BDLG":"F24H","3BD":"F3D","APA":"F24H","DSTU":"F24H","SDR":"F24H","STU":"F24H","STUL":"F24H","STULG":"F24H"},"3NFLEX":"F3D","3NFLEXLOYALTY":"F3D","3NFLEXOTA":"F3D","3NFLEXPROMO":"F3D","5NFLEX":{"2BDLG":"F7D","3BD":"F7D","APA":"F7D","DSTU":"F7D","SDR":"F3D","STU":"F7D","STUL":"F3D","STULG":"F3D"},"5NFLEXLOYALTY":{"2BDLG":"F7D","3BD":"F7D","APA":"F7D","DSTU":"F7D","SDR":"F3D","STU":"F7D","STUL":"F3D","STULG":"F3D"},"5NFLEXOTA":{"2BDLG":"F7D","3BD":"F7D","APA":"F7D","DSTU":"F7D","SDR":"F3D","STU":"F7D","STUL":"F3D","STULG":"F3D"},"5NFLEXPROMO":{"2BDLG":"F7D","3BD":"F7D","APA":"F7D","DSTU":"F7D","SDR":"F3D","STU":"F7D","STUL":"F3D","STULG":"F3D"},"7NFLEX":{"2BDLG":"F7D","3BD":"SEMIFLEX","APA":"F7D","DSTU":"F7D","SDR":"F7D","STU":"F7D","STUL":"F7D","STULG":"F7D"},"7NFLEXLOYALTY":{"2BDLG":"F7D","3BD":"SEMIFLEX","APA":"F7D","DSTU":"F7D","SDR":"F7D","STU":"F7D","STUL":"F7D","STULG":"F7D"},"7NFLEXOTA":{"2BDLG":"F7D","3BD":"SEMIFLEX","APA":"F7D","DSTU":"F7D","SDR":"F7D","STU":"F7D","STUL":"F7D","STULG":"F7D"},"7NFLEXPROMO":{"2BDLG":"F7D","3BD":"SEMIFLEX","APA":"F7D","DSTU":"F7D","SDR":"F7D","STU":"F7D","STUL":"F7D","STULG":"F7D"},"DIRECTLOS1":"F3D","DIRECTLOS14":"SEMI30D","DIRECTLOS2":"F3D","DIRECTLOS3":"F7D","DIRECTLOS7":"SEMIFLEX","EXTENDEDSTAY1":"NONREF","EXTENDEDSTAY2":"NONREF","FLEXDIRECT":{"2BDLG":"F24H","3BD":"F3D","APA":"F24H","DSTU":"F24H","STU":"F24H","STUL":"F24H","STULG":"F24H"},"FLEXIBLE":{"2BDLG":"F24H","3BD":"F3D","APA":"F24H","DSTU":"F24H","SDR":"F24H","STU":"F24H","STUL":"F24H","STULG":"F24H"},"FLEXIBLEOTA":{"2BDLG":"F24H","3BD":"F3D","APA":"F24H","DSTU":"F24H","SDR":"F24H","STU":"F24H","STUL":"F24H","STULG":"F24H"},"FLEXLOYALTY":{"2BDLG":"F24H","3BD":"F3D","APA":"F24H","DSTU":"F24H","SDR":"F24H","STU":"F24H","STUL":"F24H","STULG":"F24H"},"FLEXMEMBERPROMO":"F24H","FLEXPROMO":{"3BD":"F3D","APA":"F24H","STUL":"F24H","STULG":"F24H"},"MEMBERFLEX":"SEMIFLEX","MIDTERM":"SEMIFLEX","MIDTERMLOYALTY":"SEMIFLEX","MIDTERMOTA":"SEMIFLEX","MIDTERMPROMO":"SEMIFLEX","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATELOAYLATY":"NONREF","NRFRATELOYALTY":"NONREF","NRFRATEOTA":"NONREF","NRFRATEPROMO":"NONREF","OTALOS1":"F7D","OTALOS14":"SEMI42D","OTALOS2":"F7D","OTALOS3":"SEMIFLEX","OTALOS7":"SEMI30D","OTASEMILOS1":"SEMI60D","OTASEMILOS14":"SEMI60D","OTASEMILOS2":"SEMI60D","OTASEMILOS3":"SEMI60D","OTASEMILOS7":"SEMI60D","PROMOOTALOS1":"F7D","PROMOOTALOS2":"F7D","PROMOOTALOS3":"SEMIFLEX","PROMOOTALOS7":"SEMI30D","SEMIFLEXLOS14":"SEMI45D","SEMIFLEXLOS3":"SEMI45D","SEMIFLEXLOS7":"SEMI45D","TEST100":"F7D","TESTRATE":"F24H"},"WARWICK":{"14NFLEX":"F7D","14NFLEXLOYALTY":"F7D","14NFLEXOTA":"F7D","14NFLEXPROMO":"F7D","2NFLEX":"FLEX","2NFLEXLOYALTY":"FLEX","2NFLEXOTA":"FLEX","2NFLEXPROMO":"FLEX","3NFLEX":"FLEX3N","3NFLEXLOYALTY":"FLEX3N","3NFLEXOTA":"FLEX3N","3NFLEXPROMO":"FLEX3N","5NFLEX":"FLEX3N","5NFLEXLOYALTY":"FLEX3N","5NFLEXOTA":"FLEX3N","5NFLEXPROMO":"FLEX3N","7NFLEX":"F7D","7NFLEXLOYALTY":"F7D","7NFLEXOTA":"F7D","7NFLEXPROMO":"F7D","DIRECTLOS1":"FLEX","DIRECTLOS14":"SEMIFLEX14","DIRECTLOS2":"FLEX","DIRECTLOS3":"FLEX3N","DIRECTLOS7":"F7D","FLEXDIRECT":"FLEX","FLEXIBLE":"FLEX","FLEXIBLEOTA":"FLEX","FLEXLOYALTY":"FLEX","FLEXPROMO":"FLEX","MIDTERM":"SEMIFLEX14","MIDTERMLOYALTY":"SEMIFLEX14","MIDTERMOTA":"SEMIFLEX14","MIDTERMPROMO":"SEMIFLEX14","NRFLOS1":"NONREF","NRFLOS14":"NONREF","NRFLOS2":"NONREF","NRFLOS3":"NONREF","NRFLOS7":"NONREF","NRFRATE":"NONREF","NRFRATELOYALTY":"NONREF","NRFRATEOTA":"NONREF","NRFRATEPROMO":"NONREF","NRLOYALTY":"NONREF","OTALOS1":"FLEX3N","OTALOS14":"SEMIFLEX","OTALOS2":"FLEX3N","OTALOS3":"F7D","OTALOS7":"SEMIFLEX14","OTASEMILOS1":"SEMI42D","OTASEMILOS14":"SEMI42D","OTASEMILOS2":"SEMI42D","OTASEMILOS3":"SEMI42D","OTASEMILOS7":"SEMI42D","PROMOOTALOS1":"FLEX3N","PROMOOTALOS2":"FLEX3N","PROMOOTALOS3":"F7D","PROMOOTALOS7":"SEMIFLEX14","SEMIFLEXLOS14":"SEMIFLEX","SEMIFLEXLOS3":"SEMIFLEX","SEMIFLEXLOS7":"SEMIFLEX"}},"POL":{"6KP":{"F24H":24,"FLEX":120,"FLEX3N":72,"NONREF":-1,"SEMI28D":672,"SEMI42D":1008,"SEMIFLEX":720,"SEMIFLEX14":336,"SF7D":168,"SFLEX":48},"ANTIGAL":{"F24H":24,"FLEX":120,"FLEX1":168,"FLEX3N":72,"NONREF":-1,"SEMI30D":720,"SEMIFLEX":672,"SEMIFLEX14":336,"SFLEX":48},"BAKERY":{"F24H":24,"FLEX":120,"FLEX3N":72,"NONREF":-1,"SEMI28D":672,"SEMI42D":1008,"SEMI60D":1440,"SEMIFLEX":720,"SEMIFLEX10":240,"SEMIFLEX14":336,"SF7D":168,"SFLEX":48},"BOURNE":{"F24H":24,"FLEX":120,"FLEX3N":72,"FLEX7N":168,"NONREF":-1,"SEMI30D":720,"SEMI42D":1008,"SEMI45D":1080,"SEMI56D":1440,"SEMI60D":1440,"SEMIFLEX":672,"SEMIFLEX15":336},"BRONDBRY":{"F24H":24,"F3D":72,"F7D":168,"FLEX":120,"NONREF":-1,"SEMI28D":672,"SEMI42D":1008,"SEMI60D":1440,"SEMIFLEX":720,"SEMIFLEX14":336,"SFLEX":48},"CARLYSLE":{"10DAYS":240,"F24H":24,"FLEX":120,"FLEX3N":72,"FLEX7N":168,"NONREF":-1,"SEMI30D":720,"SEMI42D":1008,"SEMI45D":1080,"SEMI56D":1440,"SEMI60D":1440,"SEMIFLEX":672,"SEMIFLEX15":336,"SFLEX":48},"CHENISTON":{"F24H":24,"FLEX":120,"FLEX3N":72,"FLEX7N":168,"NONREF":-1,"SEMI30D":720,"SEMI42D":1008,"SEMI60D":1440,"SEMIFLEX":672,"SEMIFLEX15":336},"CLARIDGE":{"F24H":24,"F3D":72,"FLEX":120,"FLEX1":168,"NONREF":-1,"SEMI28D":672,"SEMI42D":1008,"SEMI56D":1344,"SEMI60D":1440,"SEMI90D":2160,"SEMIFLEX":720,"SEMIFLEX14":336,"SFLEX":48},"COURTFIELD":{"F24H":24,"F3D":72,"F7D":168,"FLEX":120,"NONREF":-1,"SEMI28D":672,"SEMI42D":1008,"SEMI60D":1440,"SEMIFLEX":336,"SEMIFLEX30":720},"DTH":{"F24H":24,"FLEX":120,"FLEX1":168,"FLEX3N":72,"NONREF":-1,"SEMI30D":720,"SEMI42D":1008,"SEMIFLEX":672,"SEMIFLEX14":336,"SFLEX":48},"ECCLESTON":{"F24H":24,"FLEX1":168,"FLEX3N":72,"NONREF":-1,"SEMI28D":672,"SEMI42D":1008,"SEMI45D":1080,"SEMI56D":1344,"SEMI60D":1440,"SEMIFLEX":720,"SEMIFLEX14":336},"HARROW":{"F24H":24,"F3D":72,"FLEX":120,"NONREF":-1,"SEMI28D":672,"SEMI42D":1008,"SEMIFLEX":720,"SEMIFLEX10":240,"SEMIFLEX14":336,"SF7D":168,"SFLEX":48},"HERMES":{"F24H":24,"F3D":72,"F7D":168,"FLEX":120,"NONREF":-1,"SEMI28D":672,"SEMI42D":1008,"SEMIFLEX":336,"SEMIFLEX30":720},"KINGSYARD":{"F24H":24,"FLEX":0,"FLEX1":168,"FLEX3N":72,"NONREF":-1,"SEMI28D":672,"SEMI42D":1008,"SEMI45D":1080,"SEMI56D":1344,"SEMI60D":1440,"SEMIFLEX":720,"SEMIFLEX14":336},"MADDOX":{"F24H":24,"F3D":72,"FLEX":120,"NONREF":-1,"SEMI28D":672,"SEMI42D":1008,"SEMI45D":1080,"SEMI56D":1344,"SEMI60D":1440,"SEMIFLEX":720,"SEMIFLEX10":240,"SEMIFLEX14":336,"SF7D":168,"SFLEX":48},"REGENCY":{"F24H":24,"F3D":72,"F7D":168,"FLEX":120,"NONREF":-1,"SEMI30D":720,"SEMI42D":1008,"SEMI45D":1080,"SEMI60D":1440,"SEMIFLEX":336,"SEMIFLEX30":672},"WARWICK":{"F5D":120,"F7D":168,"FLEX":24,"FLEX3N":72,"NONREF":-1,"SEMI28D":672,"SEMI42D":1008,"SEMIFLEX":720,"SEMIFLEX14":336,"SFLEX":48}},"POLN":{"6KP":{"flex 24h":24,"flex 3d":72,"flex 5d":120,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 7d":168},"ANTIGAL":{"flex 24h":24,"flex 3d":72,"flex 5d":120,"flex 7d":168,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720},"BAKERY":{"flex 24h":24,"flexible 3d":72,"flexible 5d":120,"non refundable":-1,"semi flex 28d":672,"semi flex 42d":1008,"semi flex 60d":1440,"semi flexible 10d":240,"semi flexible 14d":336,"semi flexible 30d":720,"semiflex 7d":168},"BOURNE":{"flex 1d":24,"flex 3d":72,"flex 5d":120,"flex 7d":168,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 45d":1080,"semi flex 60d":1440},"BRONDBRY":{"flex 24h":24,"flex 3d":72,"flex 5d":120,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 60d":1440,"semi flex 7d":168},"CARLYSLE":{"10 days":240,"flex 3d":72,"flex 5d":120,"flex 7d":168,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 45d":1080,"semi flex 60d":1440,"super flex 24h":24,"super flexible":48},"CHENISTON":{"flex 1d":24,"flex 3d":72,"flex 5d":120,"flex 7d":168,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 60d":1440},"CLARIDGE":{"flex 24h":24,"flex 3d":72,"flex 5d":120,"flex 7d":168,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 56d":1344,"semi flex 60d":1440,"semi flex 90d":2160},"COURTFIELD":{"flex 24h":24,"flex 3d":72,"flex 5d":120,"flex 7d":168,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 60d":1440},"DTH":{"flex 24h":24,"flex 3d":72,"flex 5d":120,"flex 7d":168,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008},"ECCLESTON":{"flex 24h":24,"flex 3d":72,"flex 7d":168,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 45d":1080,"semi flex 56d":1344,"semi flex 60d":1440},"HARROW":{"flex 24h":24,"flex 3d":72,"flex 5d":120,"non refundable":-1,"semi flex 10d":240,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 7d":168},"HERMES":{"flex 24h":24,"flex 3d":72,"flex 5d":120,"flex 7d":168,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008},"KINGSYARD":{"flex 24h":24,"flex 3d":72,"flex 7d":168,"flexible":0,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 45d":1080,"semi flex 56d":1344,"semi flex 60d":1440},"MADDOX":{"flex 3d":72,"flex 5d":120,"flexible 24h":24,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 45d":1080,"semi flex 56d":1344,"semi flex 60d":1440,"semi flex 7d":168,"semi flexible 10 days":240},"REGENCY":{"flex 24h":24,"flex 3d":72,"flex 5d":120,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008,"semi flex 45d":1080,"semi flex 60d":1440,"semi flex 7d":168},"WARWICK":{"flex 24h":24,"flex 3d":72,"flex 5d":120,"flex 7d":168,"non refundable":-1,"semi flex 14d":336,"semi flex 28d":672,"semi flex 30d":720,"semi flex 42d":1008}},"UGN":{"6KP":{"apartment":["APA"],"deluxe studio king":["DSTU"],"standard double":["SDR"],"studio double":["STU"],"studio lower ground":["STUL"],"studio with balcony":["STUB"]},"ANTIGAL":{"small studio":["STUL"],"spare unit group":["STUB"],"studio":["STU"]},"BAKERY":{"2 bedroom penthouse":["STUB"],"studio apartment":["STUL"],"studio apartment lg":["STU"]},"BOURNE":{"1 bedroom apartment":["4BEDROOM7"],"2 bedroom apartment":["2BEDROOM"],"3 bedroom apartment":["3BEDROOM"],"3 bedroom deluxe apartment":["4BEDROOM8"]},"BRONDBRY":{"superior studio":["STUL"]},"CARLYSLE":{"2 bedroom apartment":["2BEDROOM"],"3 bedroom apartment":["3BEDROOM"],"4 bedroom apartment, sleeps 7":["4BEDROOM7"],"4 bedroom apartment, sleeps 8":["4BEDROOM8"],"unused":["2BED","2BEDFLAT1","2BEDFLAT3","2BEDFLAT5","3BED","3BEDFLAT2","3BEDFLAT4","3BEDFLAT6","3BEDSINGLE","4BED","4BEDFLAT11","4BEDFLAT12"]},"CHENISTON":{"1 bedroom apartment":["4BEDROOM8"],"deluxe studio":["3BEDROOM"],"studio":["2BEDROOM"],"studio lower ground":["4BEDROOM7"]},"CLARIDGE":{"1 bedroom apartment":["STUL"],"1 bedroom apartment deluxe":["D1BD"],"2 bedroom apartment":["STU"],"2 bedroom apartment deluxe":["STUB"],"3 bedroom apartment":["DSTU"]},"COURTFIELD":{"1 bed apartment":["APA"],"deluxe studio":["STU"],"studio":["SDR"],"studio lower ground":["STUL"],"superior studio lower ground":["DSTU"]},"DTH":{"deluxe penthouse apartment":["DSTU"],"penthouse studio":["STUB"],"studio apartment":["STU"],"superior studio":["STUL"]},"ECCLESTON":{"1 bedroom apartment":["STUB"],"1 bedroom deluxe apartment":["STUL"],"2 bedroom apartment":["DSTU"],"2 bedroom deluxe apartment":["STU"]},"HARROW":{"apex small studio":["APEX"],"apex studio with terrace":["APEXTERRAC"],"deluxe studio":["SDEL"],"penthouse studio":["STU"],"standard studio":["STUL"]},"HERMES":{"deluxe family suite":["FSB"],"deluxe king room":["STUL"],"deluxe loft":["STU"],"family room":["DSTU"],"king room":["STDBL"],"king room with garden view":["APA"],"superior king room":["SDR"]},"KINGSYARD":{"2 bedroom apartment deluxe":["STUB"],"2 bedroom apartment deluxe ground floor":["DSTU"]},"MADDOX":{"2 bedroom apartment":["STU"],"3 bedroom apartment":["STUB"],"3 bedroom apartment lg":["STUL"]},"REGENCY":{"1 bedroom apartment":["SDR"],"1 bedroom apartment lg":["STUL"],"2 bedroom apartment":["DSTU"],"2 bedroom apartment 1bath":["STU"],"2 bedroom apartment lg":["2BDLG"],"2 bedroom apartment w.mezzanine":["APA"],"3 bedroom apartment":["3BD"],"studio apartment lg":["STULG"]},"WARWICK":{"family room (lower ground)":["DELUXE"],"king room":["STANDARD"],"standard double room":["DELUXELG"],"standard double room (lower ground)":["STANDARDLG"]}},"snapshot":"12 Oct 2026 \u00b7 PROMOOTA aligned, Carlyle OTALOSS1 deleted"};
+
+/* ---------------- wiring ---------------- */
+['created','cancelled'].forEach(kind=>{
+  const z=$('uz-'+kind),fi=$('fi-'+kind);
+  z.addEventListener('click',()=>fi.click());
+  z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('drag');});
+  z.addEventListener('dragleave',()=>z.classList.remove('drag'));
+  z.addEventListener('drop',e=>{e.preventDefault();z.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)loadFile(kind,f);});
+  fi.addEventListener('change',e=>{const f=e.target.files[0];if(f)loadFile(kind,f);fi.value='';});
+});
+$('open-btn').addEventListener('click',openTracker);
+$('btn-files').addEventListener('click',()=>{$('results').classList.add('hidden');$('upload-area').classList.remove('hidden');showWarns('upload-warns');});
+$('btn-export').addEventListener('click',exportCSV);
+$('btn-ai').addEventListener('click',runAI);
+$('from').addEventListener('change',applyDates);
+$('to').addEventListener('change',applyDates);
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act]');if(!t)return;
+  const a=t.dataset.act;
+  if(a==='tab'){S.tab=t.dataset.tab;render();if(t.classList.contains('go'))$('tabs').scrollIntoView({behavior:'smooth'});}
+  else if(a==='prop'){S.prop=t.dataset.prop;S.open={};render();}
+  else if(a==='split'){S.split=t.dataset.split;render();}
+  else if(a==='month'){const k=t.dataset.key;if(S.open[k])delete S.open[k];else S.open[k]=1;render();}
+  else if(a==='preset')preset(t.dataset.preset);
+});
+</script>
+</body>
+</html>
